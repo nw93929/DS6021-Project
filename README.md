@@ -9,3 +9,7 @@ streamlit run Main.py
 ```
 Please do not put any non dashboard files in that directory.
 
+## Final Presentation
+Access the final presentation for this project [here](https://docs.google.com/presentation/d/1sAUolE4szf1zlqkt2Uhf214bI3dsnUf1DcD1E-f3liA/edit?usp=sharing)
+
+
