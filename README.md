@@ -13,7 +13,7 @@ Please do not put any non dashboard files in that directory.
 Scripts for cleaning and doing Exploratory Data Analysis is located in this folder. 
 
 ## Data
-Contains the raw and cleaned data within this folder. 
+Contains the raw and cleaned data within this folder. The raw data is sourced from 2 sources. 
 
 ## Modeling
 Contains scripts for creating various predictive models

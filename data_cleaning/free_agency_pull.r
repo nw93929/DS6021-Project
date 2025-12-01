@@ -4,6 +4,8 @@ if (!requireNamespace("baseballr", quietly = TRUE)) {
 library(baseballr)
 library(dplyr)
 library(lubridate)
+library(rstudioapi)
+library(readr)
 
 # Vector of years
 years <- 2003:2017
@@ -23,7 +25,6 @@ for (yr in years) {
       signed_year = year(date_signed),     # year extracted from date_signed
       season = yr                          # add loop year as 'season' column
     )
-  
   # Add to list without filtering
   all_free_agents[[as.character(yr)]] <- fa_tbl
 }
@@ -31,16 +32,13 @@ for (yr in years) {
 # Combine all years into one tibble
 combined_free_agents <- bind_rows(all_free_agents)
 
-# Using base R
-write.csv(combined_free_agents, "combined_free_agents_2014_2024.csv", row.names = FALSE)
-
-# Or using readr for faster writing
-# install.packages("readr")  # if not installed
 combined_free_agents <- combined_free_agents %>%
-  select(season, everything())  # puts 'season' first, keeps all other columns after
+  select(season, everything())  # puts 'season' first
 
+# set working directory and create file path
+setwd(dirname(getActiveDocumentContext()$path))
+path <- file.path(getwd(), "data", "raw_data", "MLB_stats_free_agents.csv")
 
-setwd("C:/Users/garre/school/ds_6021/project/DS6021-Project")
-library(readr)
-write_csv(combined_free_agents, "combined_free_agents_2014_2024.csv")
+# create output file
+write_csv(combined_free_agents, path)
 
