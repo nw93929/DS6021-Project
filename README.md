@@ -10,13 +10,19 @@ streamlit run Main.py
 Please do not put any non dashboard files in that directory.
 
 ## Data Cleaning and EDA
-Scripts for cleaning and doing Exploratory Data Analysis is located in this folder. 
+Scripts for pulling and cleaning data and executing exploratory data analysis are located in this folder. 
 
 ## Data
-Contains the raw and cleaned data within this folder. The raw data is sourced from 2 sources. 
+The raw and cleaned data utilized in the models are located in this folder. Please view the ReadMe in this folder for details regarding the sources and specifics of the data.
 
 ## Modeling
-Contains scripts for creating various predictive models
+Contains scripts for generating the following models for both Pitchers and Batters.
+
+1. Linear Regression
+2. Logistic Regression
+3. KNN
+4. KMeans
+5. PCA
 
 ## Final Presentation
 Access the final presentation for this project [here](https://docs.google.com/presentation/d/1sAUolE4szf1zlqkt2Uhf214bI3dsnUf1DcD1E-f3liA/edit?usp=sharing)
