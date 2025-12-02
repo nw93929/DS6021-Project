@@ -2,6 +2,9 @@
 Final Project for DS6021 Predictive Modeling @UVA School of Data Science MSDS Program. <br>
 Authors: Nathan Wan, Garret Knapp, Will Brannock, Joseph Kaminetz, Faizan Khan
 
+## Overview
+This project utilizes data from Lahman Baseball Database and MLB Stats API to generate both supervised and unsupervised machine learning models.
+
 ## Dashboard Info
 Dashboard files are located in the `dashboard/` directory. To run the dashboard, navigate to that directory and run:
 ```
