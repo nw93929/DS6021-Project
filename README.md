@@ -15,8 +15,32 @@ Please do not put any non dashboard files in that directory.
 ## Data Cleaning and EDA
 Scripts for pulling and cleaning data and executing exploratory data analysis are located in this folder. 
 
-## Data
-The raw and cleaned data utilized in the models are located in this folder. Please view the ReadMe in this folder for details regarding the sources and specifics of the data.
+## **Data**
+
+This directory contains all datasets used in the project, divided into **raw** and **cleaned** subsets.
+
+---
+
+### **Raw Data**
+
+Raw datasets come from two sources:
+
+* the **Lahman Baseball Database** (via the *pylahman* package), and
+* the **MLB Stats API** (via the *baseballr* package).
+
+#### **1. Lahman**
+
+The `lahman/` folder includes all raw CSV files pulled using *pylahman*. These are the unmodified datasets used throughout the project.
+
+#### **2. MLB_stats_free_agents.csv**
+
+This file contains MLB free-agent information from **2003–2015**, retrieved using the `mlb_people_free_agents()` function from *baseballr*.
+For full details on how this data was collected, see the `free_agency_pull.r` script.
+
+### **Cleaned Data**
+
+This folder includes all datasets that have been cleaned, merged, or feature-engineered for use in the analysis and modeling stages.
+
 
 ## Modeling
 Contains scripts for generating the following models for both Pitchers and Batters.
