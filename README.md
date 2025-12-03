@@ -50,6 +50,7 @@ Contains scripts for generating the following models for both Pitchers and Batte
 3. KNN
 4. KMeans
 5. PCA
+6. PCA Regression
 
 ## Final Presentation
 Access the final presentation for this project [here](https://docs.google.com/presentation/d/1sAUolE4szf1zlqkt2Uhf214bI3dsnUf1DcD1E-f3liA/edit?usp=sharing)
