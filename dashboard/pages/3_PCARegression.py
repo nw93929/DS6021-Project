@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import plotly
 import streamlit as st
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
