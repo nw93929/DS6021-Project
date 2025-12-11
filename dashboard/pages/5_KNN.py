@@ -183,13 +183,55 @@ st.plotly_chart(
     use_container_width=True,
 )
 
-st.header("ℹ️ How this matches the notebook")
+st.header("🔧 Try Your Own K")
+
 st.markdown(
-    """
-- **Feature selection**: Dropped the same ID/target/award columns and used numeric features only.
-- **Preprocessing**: Median imputation and standardization identical to the notebook.
-- **Hyperparameter search**: Grid search over k = [3,5,7,9,11] and weights ∈ {uniform, distance}.
-- **Evaluation**: 80/20 train-test split with R², MSE/RMSE, and the diagonal scatter plot from the notebook.
-"""
+    "Adjust the number of neighbors and weighting to see how model performance changes."
 )
+
+# --- User Controls ---
+user_k = st.slider("Choose k (number of neighbors)", min_value=1, max_value=25, value=best_params["n_neighbors"])
+user_weights = st.selectbox("Weighting scheme:", ["uniform", "distance"], index=0)
+
+# --- Refit model with user settings ---
+with st.spinner("Evaluating model with selected k..."):
+    # Reuse imputer & scaler from earlier
+    # So we need to re-run scaling on same splits
+    X_train_raw, X_test_raw, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=RANDOM_STATE
+    )
+
+    imputer = SimpleImputer(strategy="median")
+    X_train_imputed = imputer.fit_transform(X_train_raw)
+    X_test_imputed = imputer.transform(X_test_raw)
+
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train_imputed)
+    X_test_scaled = scaler.transform(X_test_imputed)
+
+    # User-selected model
+    knn_user = KNeighborsRegressor(n_neighbors=user_k, weights=user_weights)
+    knn_user.fit(X_train_scaled, y_train)
+    y_pred_user = knn_user.predict(X_test_scaled)
+
+    user_mse = mean_squared_error(y_test, y_pred_user)
+    user_rmse = np.sqrt(user_mse)
+    user_r2 = r2_score(y_test, y_pred_user)
+
+# --- Performance Display ---
+colA, colB, colC = st.columns(3)
+colA.metric("R²", f"{user_r2:.3f}")
+colB.metric("MSE", f"{user_mse:.2f}")
+colC.metric("RMSE", f"{user_rmse:.0f}")
+
+# --- Plot ---
+st.plotly_chart(
+    build_actual_vs_pred_plot(
+        y_test,
+        y_pred_user,
+        f"Actual vs Predicted — Custom K = {user_k}",
+    ),
+    use_container_width=True,
+)
+
 
