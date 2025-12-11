@@ -84,8 +84,9 @@ def compute_pca_outputs(X: pd.DataFrame):
     pc_cols = [f"PC{i}" for i in range(1, n_components + 1)]
     scores_df = pd.DataFrame(scores, columns=pc_cols)
 
-    loadings = pca_model.components_.T[:, :2]
-    loading_df = pd.DataFrame(loadings, index=X.columns, columns=["PC1_loading", "PC2_loading"])
+    loadings = pca_model.components_.T
+    loading_cols = [f"PC{i}" for i in range(1, n_components + 1)]
+    loading_df = pd.DataFrame(loadings, index=X.columns, columns=loading_cols)
     return ev_df, scores_df, loading_df
 
 
@@ -114,8 +115,7 @@ def build_scree_plot(ev_df: pd.DataFrame):
     return fig
 
 
-def build_biplot(scores_df: pd.DataFrame, loading_df: pd.DataFrame, ids, label: str):
-    arrow_scale = 3
+def build_biplot(scores_df: pd.DataFrame, loading_df: pd.DataFrame, ids, label: str, arrow_scale: float = 16.0, arrow_line_width: int = 3):
     fig = go.Figure()
     fig.add_trace(
         go.Scatter(
@@ -125,11 +125,12 @@ def build_biplot(scores_df: pd.DataFrame, loading_df: pd.DataFrame, ids, label: 
             name=label,
             hoverinfo="text",
             hovertext=ids,
+            marker=dict(opacity=0.7),
         )
     )
     for var_name, row in loading_df.iterrows():
-        x_arrow = row["PC1_loading"] * arrow_scale
-        y_arrow = row["PC2_loading"] * arrow_scale
+        x_arrow = row["PC1"] * arrow_scale
+        y_arrow = row["PC2"] * arrow_scale
         fig.add_trace(
             go.Scatter(
                 x=[0, x_arrow],
@@ -138,6 +139,9 @@ def build_biplot(scores_df: pd.DataFrame, loading_df: pd.DataFrame, ids, label: 
                 text=[None, var_name],
                 textposition="top center",
                 showlegend=False,
+                line=dict(width=arrow_line_width),
+                marker=dict(size=8),
+                textfont=dict(size=12, color="black"),
             )
         )
     fig.update_layout(
@@ -182,16 +186,6 @@ st.markdown("""
 **Principal Component Regression** uses PCA to perform dimensionality reduction before applying linear regression 
 to predict baseball player free agent salaries. This approach addresses multicollinearity among 
 performance statistics and reduces model complexity.
-
-**Key Metrics:**
-- **Batters Model**: 5 principal components
-  - Train R2: 0.6019 | Test R2: 0.5712
-  - Train RMSE: 2813816.92 | Test RMSE: 3275404.98
-- **Pitchers Model**: 4 principal components
-  - Train R2: 0.5913 | Test R2: 0.5610
-  - Train RMSE: 2957157.11 | Test RMSE: 2489621.87
-- **Target Variable**: Free agent salary
-- **Train/Test Split**: 80/20 with random seed 42
 """)
 
 # About the Model
@@ -235,17 +229,8 @@ st.markdown("""
 """)
 
 # Results/Performance
-st.header("📊 Results/Performance")
+st.header("📊 Plot Interpretations")
 st.markdown("""
-Model performance is evaluated using **R² (coefficient of determination)** and **RMSE (root mean squared error)**:
-
-- **R²**: Proportion of variance in salaries explained by the model (higher is better, max = 1.0)
-- **RMSE**: Average prediction error in dollars (lower is better)
-
-Performance metrics are shown below for both training and test sets. A good model will have:
-- High R² on both train and test (close to each other, indicating no overfitting)
-- Low RMSE relative to typical salary ranges ($500K - $30M+)
-
 **Interpreting the visualizations:**
 - **Correlation Matrix**: Shows relationships between original features (pre-PCA)
 - **Scree Plot**: Displays variance explained by each PC (helps choose n_components)
@@ -286,4 +271,25 @@ metric_cols[3].metric("Test RMSE", f"{results['test_rmse']:.1f}")
 
 st.plotly_chart(build_correlation_heatmap(X, "Correlation Matrix of Original Variables"), use_container_width=True)
 st.plotly_chart(build_scree_plot(ev_df), use_container_width=True)
-st.plotly_chart(build_biplot(scores_df, loading_df, original_df["playerID"], label=choice), use_container_width=True)
+st.plotly_chart(
+    build_biplot(
+        scores_df,
+        loading_df,
+        original_df["playerID"],
+        label=choice,
+    ),
+    use_container_width=True,
+)
+
+st.header("🔢 Principal Component Loadings")
+st.markdown(
+    "Feature weights for each principal component. Large positive/negative values indicate strong influence on that component."
+)
+loading_cols_to_show = [c for c in loading_df.columns if c.startswith("PC")][: config["n_components"]]
+if loading_cols_to_show:
+    st.dataframe(
+        loading_df[loading_cols_to_show].style.background_gradient(
+            cmap="RdYlGn", axis=1, subset=loading_cols_to_show, vmin=-1.0, vmax=1.0
+        ),
+        use_container_width=True,
+    )
