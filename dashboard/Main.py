@@ -102,6 +102,23 @@ Based off our cluster analysis and comparisons of the characteristics of each gr
 #### Pitchers (reference kmeans - pitchers.ipynb)
 
 Based off the cluster analysis and cluster characteristic comparison visuals, we can say that cluster 0 appears to be older, less playtime players who play for a few power innings with higher strikeout rates, and allow less runs to happen. Meanwhile cluster 1 seems to represent younger, starting pitchers who allow more runs and have lower strikeout rates, probably due to the fact they are rookies and play more innings. Between these two groups, we see a statistically significant difference in salary and contract lengths, but investigating the standardized differences after accounting for outliers reveals that these differences are small for both comparisons, with older cluster 0 pitchers making about .2 standard deviations more on average.
+
+### PCA Regression
+
+#### Batters (reference models/PCA Regression- Batters.ipynb)
+
+Using 5 principal components, the PCR model delivers a test R² of 0.571 (train R² 0.602) with a test RMSE of roughly $3.28M. That means
+the compressed feature set still explains a little over half of the variance in free‑agent salaries, but typical errors are several million
+dollars. The PCs largely capture overall offensive output and volume, so the model favors hitters with broad production profiles. Despite the
+dimensionality reduction solving the multicollinearity issue, accuracy lags behind the plain linear model, suggesting important information was
+lost when collapsing the feature space.
+
+#### Pitchers (reference models/PCA Regression- Pitchers.ipynb)
+
+With 4 components, the pitcher PCR reaches a test R² of 0.561 (train R² 0.591) and a test RMSE near $2.49M. The components primarily summarize
+workload and run-prevention stats; the model rewards pitchers who log innings with strong run suppression but still misses finer salary
+drivers. Like the batters’ model, PCR improves stability in the presence of correlated stats but underperforms the simpler regression in both
+fit and error, indicating that reducing dimensionality trimmed away useful signal.
 ###
 ---
 """
