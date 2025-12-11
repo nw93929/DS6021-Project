@@ -205,7 +205,7 @@ def build_elbow_plot(k_values, wcss):
         y=wcss,
         markers=True,
         labels={"x": "Number of Clusters (k)", "y": "WCSS / Inertia"},
-        title="Elbow Plot (StandardScaler → PCA → K-Means)",
+        title="Elbow Plot (StandardScaler → K-Means)",
     )
     fig.update_layout(height=450)
     return fig
@@ -238,37 +238,77 @@ def build_cumulative_variance_plot(pca: PCA):
         x0=1, y0=0.85, x1=len(cum), y1=0.85,
         line=dict(color="Red", width=1, dash="dash"),
     )
+    # Adjusted position to prevent overlap
+    max_comp = len(cum)
     fig.add_annotation(
-        x=len(cum) + 0.1, y=0.85,
+        x=max_comp, y=0.85,
         text="85% Threshold",
         showarrow=False,
-        font=dict(color="Red"),
+        xanchor='right', # Anchor text to the right
+        yanchor='bottom', # Anchor text just below the line
+        font=dict(color="Red", size=10),
     )
-    fig.update_layout(yaxis=dict(range=[0, 1]))
+    fig.update_layout(yaxis=dict(range=[0, 1.05]))
     return fig
 
 
-def build_biplot(scores_df: pd.DataFrame, loading_df: pd.DataFrame, clusters, segment_label: str):
-    arrow_scale = 6
+def build_biplot_interactive(
+    scores_df: pd.DataFrame, 
+    loading_df: pd.DataFrame, 
+    clusters: pd.Series, 
+    segment_label: str,
+    pc_x: int,
+    pc_y: int,
+    scale_factor: float,
+    cluster_distinction: bool,
+):
+    pc_x_col = f"PC{pc_x}"
+    pc_y_col = f"PC{pc_y}"
+    
+    if pc_x_col not in scores_df.columns or pc_y_col not in scores_df.columns:
+        # This should ideally not happen with selectbox, but good for robustness
+        st.error(f"Cannot plot {pc_x_col} or {pc_y_col}. Max PC available: {scores_df.shape[1]-1}")
+        return go.Figure()
+
     fig = go.Figure()
 
-    for cluster_id in sorted(clusters.unique()):
-        cluster_mask = clusters == cluster_id
+    # Scatter Plot of Data Points (Scores)
+    if cluster_distinction:
+        for cluster_id in sorted(clusters.unique()):
+            cluster_mask = clusters == cluster_id
+            fig.add_trace(
+                go.Scatter(
+                    x=scores_df.loc[cluster_mask, pc_x_col],
+                    y=scores_df.loc[cluster_mask, pc_y_col],
+                    mode="markers",
+                    marker=dict(size=8, opacity=0.7),
+                    name=f"Cluster {cluster_id}",
+                )
+            )
+    else:
         fig.add_trace(
             go.Scatter(
-                x=scores_df.loc[cluster_mask, "PC1"],
-                y=scores_df.loc[cluster_mask, "PC2"],
+                x=scores_df[pc_x_col],
+                y=scores_df[pc_y_col],
                 mode="markers",
                 marker=dict(size=8, opacity=0.7),
-                name=f"Cluster {cluster_id}",
+                name="All Data Points",
             )
         )
 
-    for var_name, row in loading_df.iterrows():
+    # Add Loadings (Arrows) - Filter loading matrix for chosen PCs
+    loading_df_filtered = loading_df.copy()
+    loading_df_filtered['var'] = loading_df_filtered.index
+    
+    for var_name, row in loading_df_filtered.iterrows():
+        # Use PCx_col and PCy_col dynamically
+        pc_x_load = row[pc_x_col] if pc_x_col in row else 0
+        pc_y_load = row[pc_y_col] if pc_y_col in row else 0
+        
         fig.add_trace(
             go.Scatter(
-                x=[0, row["PC1"] * arrow_scale],
-                y=[0, row["PC2"] * arrow_scale],
+                x=[0, pc_x_load * scale_factor],
+                y=[0, pc_y_load * scale_factor],
                 mode="lines+markers+text",
                 text=[None, var_name],
                 textposition="top center",
@@ -280,50 +320,70 @@ def build_biplot(scores_df: pd.DataFrame, loading_df: pd.DataFrame, clusters, se
         )
 
     fig.update_layout(
-        title=f"PCA Biplot (PC1 vs PC2) with Loadings — {segment_label}",
-        xaxis_title="PC1",
-        yaxis_title="PC2",
+        title=f"PCA Biplot: {pc_x_col} vs {pc_y_col} — {segment_label}",
+        xaxis_title=pc_x_col,
+        yaxis_title=pc_y_col,
         height=650,
-        # Ensure origin (0,0) is visible for the loading vectors
         xaxis=dict(zeroline=True, zerolinewidth=1, zerolinecolor='lightgrey'),
         yaxis=dict(zeroline=True, zerolinewidth=1, zerolinecolor='lightgrey'),
     )
     return fig
 
 
-def build_pair_scatter(scores_df: pd.DataFrame, clusters, segment_label: str):
-    # Use PC1, PC2, PC3 for the pair plot
-    dims = [c for c in scores_df.columns if c.startswith("PC")][:3]
-    plot_df = scores_df[dims].copy()
+def build_pair_scatter(df: pd.DataFrame, clusters: pd.Series, segment_label: str, data_type: str):
+    """Generates a pairplot for either PCA Scores or Original Standardized Features."""
+    
+    plot_df = df.copy()
     plot_df["cluster"] = clusters.astype(str)
+
+    if data_type == "PCA Scores":
+        # Limit to the first 5 PCs for readability
+        dims = [c for c in plot_df.columns if c.startswith("PC")]
+        title_suffix = " (PCA Scores)"
+        plot_df = plot_df[['cluster'] + dims]
+    else: # Original Data
+        # Drop non-feature columns and standardize the features
+        feature_cols = [c for c in plot_df.columns if c not in ('cluster', 'avg_salary_year', 'contract_length')]
+        plot_df = plot_df[['cluster'] + feature_cols]
+        scaler = StandardScaler()
+        plot_df[feature_cols] = scaler.fit_transform(plot_df[feature_cols])
+        # Select a subset of features for readability if too many
+        if len(feature_cols) > 6:
+            feature_cols = ['age', 'SLG', 'BB_rate', 'SO_rate', 'BABIP', 'SB_EFF'] if segment_label == "Batter Segment" else ['age', 'ERA', 'BAOpp', 'K_rate', 'GS_rate', 'WHIP']
+            plot_df = plot_df[['cluster'] + feature_cols]
+        title_suffix = " (Original Standardized Features)"
+
     sns.set(style="ticks")
     
-    # Create the seaborn pairplot
+    # Check if there are variables to plot (e.g., if feature_cols is empty)
+    vars_to_plot = plot_df.columns.drop('cluster', errors='ignore').tolist()
+    if not vars_to_plot:
+        st.warning("No valid features found for pair plot.")
+        return plt.figure()
+        
     pair_grid = sns.pairplot(
         plot_df,
         hue="cluster",
         diag_kind="kde",
         palette="Set2",
         plot_kws={"alpha": 0.7, "s": 40},
+        vars=vars_to_plot
     )
-    pair_grid.fig.suptitle(f"Pairwise PCA Scores with KDE Diagonals — {segment_label}", y=1.02)
-    plt.tight_layout() # Added for better layout in Streamlit
+    pair_grid.fig.suptitle(f"Pairwise Scatter Plots — {segment_label}{title_suffix}", y=1.02)
+    plt.tight_layout()
     return pair_grid.fig
 
 
-def build_feature_boxplots(X_with_clusters: pd.DataFrame, segment_label: str, standardize: bool = False):
+def build_feature_boxplots(X_with_clusters: pd.DataFrame, segment_label: str):
+    """Builds boxplots of features on a standardized (Z-scored) scale."""
     features_df = X_with_clusters.copy()
     feature_cols = [c for c in features_df.columns if c != "cluster"]
     
-    # Standardize if requested
-    if standardize:
-        scaler = StandardScaler()
-        features_df[feature_cols] = scaler.fit_transform(features_df[feature_cols])
-        y_label = "Z-Scored Feature Value"
-        title_suffix = " (Standardized)"
-    else:
-        y_label = "Feature Value"
-        title_suffix = " (Original Scale)"
+    # Standardize all features
+    scaler = StandardScaler()
+    features_df[feature_cols] = scaler.fit_transform(features_df[feature_cols])
+    y_label = "Z-Scored Feature Value"
+    title_suffix = " (Standardized Scale)"
 
     plot_df = features_df.melt(
         id_vars="cluster",
@@ -370,12 +430,10 @@ def build_salary_contract_plots(df_with_clusters: pd.DataFrame, segment_label: s
 def run_t_tests(df_with_clusters: pd.DataFrame):
     results = []
     
-    # Cohen's d helper
     def cohens_d(x, y):
         nx, ny = len(x), len(y)
         dof = nx + ny - 2
         std_pool = np.sqrt(((nx - 1) * np.std(x, ddof=1)**2 + (ny - 1) * np.std(y, ddof=1)**2) / dof)
-        # Handle case where pooled standard deviation is near zero
         if std_pool == 0:
             return 0
         return (np.mean(x) - np.mean(y)) / std_pool
@@ -409,9 +467,6 @@ diagnostics, PCA inspection, and compensation comparisons across clusters.
 choice = st.selectbox("Choose which group to analyze:", list(DATA_CONFIG.keys()))
 config = DATA_CONFIG[choice]
 
-st.header("📋 Analysis Summary")
-st.markdown(config["summary"])
-
 with st.spinner("Loading data and preparing features..."):
     df = load_dataset(config["file"])
     if choice == "Batters":
@@ -421,42 +476,26 @@ with st.spinner("Loading data and preparing features..."):
 
 st.write(f"Rows after cleaning: **{len(X_model)}**, features used: **{X_model.shape[1]}**")
 
-# Missingness view
-st.subheader("Missing Value Check")
-st.plotly_chart(build_missing_heatmap(missing_snapshot), use_container_width=True)
-
-# Elbow and silhouette diagnostics
-st.subheader("Clustering Diagnostics")
-with st.spinner("Running clustering diagnostics..."):
-    base_pipe = Pipeline(
-        [
-            ("scaler", StandardScaler()),
-            # PCA here is mostly to speed up calculation and ensure consistent scaling before K-Means
-            ("pca", PCA(n_components=config["n_components"], random_state=RANDOM_STATE)), 
-            ("kmeans", KMeans(init="k-means++", n_init="auto", random_state=RANDOM_STATE)),
-        ]
-    )
+# --- INITIAL DIAGNOSTICS & MODEL FIT ---
+# NOTE: The clustering diagnostics and final model fit are performed once to ensure consistency
+with st.spinner("Running clustering diagnostics and fitting model..."):
+    # Elbow and silhouette diagnostics are run on scaled data (original features)
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X_model)
 
     k_values = list(range(1, 11))
     wcss = []
-    for k in k_values:
-        # NOTE: Using PCA to reduce noise and speed up K-Means fit for diagnostics
-        pipe_for_wcss = Pipeline([("scaler", StandardScaler()), ("kmeans", KMeans(n_clusters=k, init="k-means++", n_init="auto", random_state=RANDOM_STATE))])
-        pipe_for_wcss.fit(X_model)
-        wcss.append(pipe_for_wcss["kmeans"].inertia_)
-
     sil_scores = []
     sil_k = list(range(2, 11))
-    for k in sil_k:
-        pipe_for_sil = Pipeline([("scaler", StandardScaler()), ("kmeans", KMeans(n_clusters=k, init="k-means++", n_init="auto", random_state=RANDOM_STATE))])
-        pipe_for_sil.fit(X_model)
-        sil_scores.append(silhouette_score(StandardScaler().fit_transform(X_model), pipe_for_sil["kmeans"].labels_))
+    
+    for k in k_values:
+        kmeans = KMeans(n_clusters=k, init="k-means++", n_init="auto", random_state=RANDOM_STATE)
+        kmeans.fit(X_scaled)
+        wcss.append(kmeans.inertia_)
+        if k >= 2:
+            sil_scores.append(silhouette_score(X_scaled, kmeans.labels_))
 
-st.plotly_chart(build_elbow_plot(k_values, wcss), use_container_width=True)
-st.plotly_chart(build_silhouette_plot(sil_k, sil_scores), use_container_width=True)
-
-# Fit final model with k=2 as in notebook
-with st.spinner("Fitting PCA + K-Means model..."):
+    # Fit final model with k=2, including PCA
     final_pipe = Pipeline(
         [
             ("scaler", StandardScaler()),
@@ -469,49 +508,99 @@ with st.spinner("Fitting PCA + K-Means model..."):
     pca_step: PCA = final_pipe["pca"]
     scores = final_pipe[:-1].transform(X_model)
     pc_cols = [f"PC{i}" for i in range(1, scores.shape[1] + 1)]
-    scores_df = pd.DataFrame(scores, columns=pc_cols)
+    scores_df = pd.DataFrame(scores, columns=pc_cols, index=X_model.index)
     scores_df["cluster"] = labels
 
     loading_df = pd.DataFrame(
         pca_step.components_.T, index=X_model.columns, columns=pc_cols
-    )[["PC1", "PC2"]]
+    )
+# --- END MODEL FIT ---
 
-cum_var_fig = build_cumulative_variance_plot(pca_step)
-biplot_fig = build_biplot(scores_df, loading_df, scores_df["cluster"], config["segment_label"])
 
-st.subheader("PCA Dimensionality Reduction")
-st.plotly_chart(cum_var_fig, use_container_width=True)
+# --- OUTPUT SECTIONS ---
 
-st.subheader("Principal Components Analysis")
-st.plotly_chart(biplot_fig, use_container_width=True)
+st.header("📋 Analysis Summary")
+st.markdown(config["summary"])
 
-# Pairplot (using matplotlib/seaborn requires st.pyplot)
-pair_fig = build_pair_scatter(scores_df, scores_df["cluster"], config["segment_label"])
+st.subheader("Missing Value Check")
+st.plotly_chart(build_missing_heatmap(missing_snapshot), use_container_width=True)
+
+st.subheader("Clustering Diagnostics")
+col1, col2 = st.columns(2)
+with col1:
+    st.plotly_chart(build_elbow_plot(k_values, wcss), use_container_width=True)
+with col2:
+    st.plotly_chart(build_silhouette_plot(sil_k, sil_scores), use_container_width=True)
+
+# 1. Interactive Biplot
+st.header("🔬 Interactive PCA Biplot")
+
+# Collect user inputs for the biplot
+max_pc = config["n_components"]
+pc_options = list(range(1, max_pc + 1))
+default_pc_y = 2 if max_pc >= 2 else 1 # Set default for Y-axis
+
+col_pc_x, col_pc_y, col_scale = st.columns([1, 1, 1.5])
+with col_pc_x:
+    # Use st.selectbox instead of st.slider for discrete PC numbers
+    pc_x_input = st.selectbox("Select X-axis PC:", options=pc_options, index=pc_options.index(1), key='pc_x_biplot')
+with col_pc_y:
+    # Use st.selectbox instead of st.slider for discrete PC numbers
+    pc_y_input = st.selectbox("Select Y-axis PC:", options=pc_options, index=pc_options.index(default_pc_y), key='pc_y_biplot')
+with col_scale:
+    scale_factor_input = st.slider("Arrow Scale Factor:", 1.0, 15.0, 8.0, 0.5)
+    cluster_distinction_input = st.checkbox("Show Cluster Distinction", value=True)
+
+# Generate and display the interactive biplot
+interactive_biplot_fig = build_biplot_interactive(
+    scores_df, loading_df, scores_df["cluster"], config["segment_label"],
+    pc_x=pc_x_input, pc_y=pc_y_input, 
+    scale_factor=scale_factor_input, cluster_distinction=cluster_distinction_input
+)
+st.plotly_chart(interactive_biplot_fig, use_container_width=True)
+
+
+# 2. Interactive Pairwise Scatter Plot
+st.header("🔗 Interactive Pairwise Scatter Plots")
+pair_data_choice = st.radio(
+    "Select data for pairwise plots:",
+    ("PCA Scores", "Original Standardized Features"),
+    horizontal=True,
+)
+
+# Prepare data based on choice
+if pair_data_choice == "PCA Scores":
+    pair_data_df = scores_df.drop(columns='cluster')
+else:
+    pair_data_df = X_model.copy()
+    
+# Generate and display the interactive pairplot
+pair_fig = build_pair_scatter(pair_data_df, scores_df["cluster"], config["segment_label"], pair_data_choice)
 st.pyplot(pair_fig, clear_figure=True)
 
-# Feature distributions by cluster
+
+# Feature distributions (Now always standardized)
 clustered_features = X_model.copy()
 clustered_features["cluster"] = labels
-st.subheader("Feature Distributions by Cluster")
-# Pass the boolean flag to standardize only for Pitchers
-standardize_boxes = choice == "Pitchers"
+st.header("📊 Feature Distributions by Cluster")
+st.caption("All features are shown on a Z-scored (Standardized) scale for direct comparison of means and spread, preventing dominance by high-magnitude variables like Age.")
 st.plotly_chart(
-    build_feature_boxplots(clustered_features, config["segment_label"], standardize=standardize_boxes),
+    build_feature_boxplots(clustered_features, config["segment_label"]),
     use_container_width=True,
 )
-if standardize_boxes:
-    st.caption(
-        "Pitcher feature boxplots are Z-Scored to equalize scale (e.g., K\_rate vs HR\_rate) for better visualization of cluster separation."
-    )
 
-# Salary/contract comparisons
+
+# Compensation comparisons
 salary_df = Xorig.copy()
 salary_df["cluster"] = labels
 if {"avg_salary_year", "contract_length"}.issubset(salary_df.columns):
-    st.subheader("Salary and Contract Length Comparisons")
-    salary_fig, contract_fig = build_salary_contract_plots(salary_df, config["segment_label"])
-    st.plotly_chart(salary_fig, use_container_width=True)
-    st.plotly_chart(contract_fig, use_container_width=True)
+    st.header("💵 Compensation Analysis")
+    col_salary, col_contract = st.columns(2)
+    with col_salary:
+        salary_fig, contract_fig = build_salary_contract_plots(salary_df, config["segment_label"])
+        st.plotly_chart(salary_fig, use_container_width=True)
+    with col_contract:
+        st.plotly_chart(contract_fig, use_container_width=True)
     
     t_results = run_t_tests(salary_df)
     if t_results:
@@ -519,7 +608,9 @@ if {"avg_salary_year", "contract_length"}.issubset(salary_df.columns):
         test_data = []
         for label, t_stat, p_val, d_val in t_results:
             is_sig = p_val < 0.05
-            sig_text = "Significant" if is_sig else "Not Significant"
+            sig_text = "**Significant**" if is_sig else "Not Significant"
+            
+            # Cohen's d interpretation based on analysis
             effect_size = ""
             if abs(d_val) < 0.2: effect_size = "Negligible"
             elif abs(d_val) < 0.5: effect_size = "Small"
