@@ -16,6 +16,7 @@ from scipy import stats
 st.set_page_config(page_title="K-Means Segmentation", page_icon="🎯")
 
 RANDOM_STATE = 6021
+# NOTE: Ensure this path is correct for your specific project structure
 DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "cleaned"
 
 DATA_CONFIG = {
@@ -23,12 +24,14 @@ DATA_CONFIG = {
         "file": "final_batters_df.csv",
         "n_components": 5,
         "summary": (
-            "Rate-based batting metrics (AVG, OBP, SLG, BB/SO rates, BABIP, SB efficiency) "
-            "replace raw counting stats so players are compared on equal opportunity. "
-            "Missingness was minimal, elbow suggested k=4 but silhouette favored k=2. "
-            "PC1 captures power/on-base production, PC2 tracks age, PC3 contrasts AVG vs SLG. "
-            "Power stats (SLG/ISO) drove the clearest cluster separation; salary differences are "
-            "visible but contract-length gaps were negligible."
+            "**Optimal Clusters (k=2):** Segmentation is primarily based on **Age/Approach**.\n\n"
+            "**Cluster 0 (Experienced/Disciplined):** Older players with significantly **lower Strikeout Rates** "
+            "and generally lower BB\_rates, suggesting a mature contact/favorable-count approach.\n\n"
+            "**Cluster 1 (Younger/Aggressive):** Younger players with significantly **higher Strikeout Rates** "
+            "and higher BB\_rates, indicative of a power/high-risk approach.\n\n"
+            "**Compensation:** There is a **statistically significant and medium effect size gap in salary** "
+            "favoring Cluster 1 (Younger/Aggressive), suggesting the market highly values their power profile "
+            "despite the higher strikeout risk. Contract length differences are negligible."
         ),
         "segment_label": "Batter Segment",
     },
@@ -36,12 +39,14 @@ DATA_CONFIG = {
         "file": "final_pitchers_df.csv",
         "n_components": 5,
         "summary": (
-            "Pitcher segmentation uses rate stats (K%, BB%, HR%, starter share, WHIP) after "
-            "dropping awards and counting totals. Missingness was minimal, elbow leaned toward "
-            "k=4 while silhouette pointed to k=2. PC1 represents overall run-prevention/whiff "
-            "profile, PC2 varies with workload/age, and PC3 captures contrasting run-prevention "
-            "patterns. PC1–PC2 offered the cleanest split; salary/contract comparisons are shown "
-            "for each pitcher cluster."
+            "**Optimal Clusters (k=2):** Segmentation is clearly driven by **Pitcher Role**.\n\n"
+            "**Cluster 0 (Relievers/Specialists):** Defined by very low **GS\_rate** (few starts), "
+            "higher K\_rates, and higher BB\_rates, typical of short-inning power pitchers.\n\n"
+            "**Cluster 1 (Starting Pitchers):** Defined by high **GS\_rate** (many starts), "
+            "lower K\_rates, and lower BB\_rates, indicative of pitchers relied on for workload and control.\n\n"
+            "**Compensation:** While the role distinction is clear, the clustering revealed **negligible differences** "
+            "in both average salary and contract length between the Starter and Reliever segments, suggesting the market "
+            "values the two roles similarly on a per-player basis, or that other factors dominate salary."
         ),
         "segment_label": "Pitcher Segment",
     },
@@ -143,6 +148,7 @@ def prepare_pitcher_features(df: pd.DataFrame):
     ]
     X = X.drop(columns=[c for c in drop_cols if c in X.columns])
 
+    # Rate-based features to mirror notebook
     X["IP"] = safe_divide(X["InnOuts"], 3)
     X["K_rate"] = safe_divide(X["SO"], X["BFP"])
     X["BB_rate"] = safe_divide(X["BB"], X["BFP"])
@@ -227,6 +233,17 @@ def build_cumulative_variance_plot(pca: PCA):
         labels={"x": "Number of Components", "y": "Cumulative Explained Variance"},
         title="Cumulative Explained Variance by Component",
     )
+    fig.add_shape(
+        type="line",
+        x0=1, y0=0.85, x1=len(cum), y1=0.85,
+        line=dict(color="Red", width=1, dash="dash"),
+    )
+    fig.add_annotation(
+        x=len(cum) + 0.1, y=0.85,
+        text="85% Threshold",
+        showarrow=False,
+        font=dict(color="Red"),
+    )
     fig.update_layout(yaxis=dict(range=[0, 1]))
     return fig
 
@@ -258,6 +275,7 @@ def build_biplot(scores_df: pd.DataFrame, loading_df: pd.DataFrame, clusters, se
                 line=dict(color="crimson", width=2),
                 marker=dict(size=5, color="crimson"),
                 showlegend=False,
+                textfont=dict(size=12)
             )
         )
 
@@ -266,15 +284,21 @@ def build_biplot(scores_df: pd.DataFrame, loading_df: pd.DataFrame, clusters, se
         xaxis_title="PC1",
         yaxis_title="PC2",
         height=650,
+        # Ensure origin (0,0) is visible for the loading vectors
+        xaxis=dict(zeroline=True, zerolinewidth=1, zerolinecolor='lightgrey'),
+        yaxis=dict(zeroline=True, zerolinewidth=1, zerolinecolor='lightgrey'),
     )
     return fig
 
 
 def build_pair_scatter(scores_df: pd.DataFrame, clusters, segment_label: str):
+    # Use PC1, PC2, PC3 for the pair plot
     dims = [c for c in scores_df.columns if c.startswith("PC")][:3]
     plot_df = scores_df[dims].copy()
     plot_df["cluster"] = clusters.astype(str)
     sns.set(style="ticks")
+    
+    # Create the seaborn pairplot
     pair_grid = sns.pairplot(
         plot_df,
         hue="cluster",
@@ -283,23 +307,27 @@ def build_pair_scatter(scores_df: pd.DataFrame, clusters, segment_label: str):
         plot_kws={"alpha": 0.7, "s": 40},
     )
     pair_grid.fig.suptitle(f"Pairwise PCA Scores with KDE Diagonals — {segment_label}", y=1.02)
+    plt.tight_layout() # Added for better layout in Streamlit
     return pair_grid.fig
 
 
 def build_feature_boxplots(X_with_clusters: pd.DataFrame, segment_label: str, standardize: bool = False):
     features_df = X_with_clusters.copy()
+    feature_cols = [c for c in features_df.columns if c != "cluster"]
+    
+    # Standardize if requested
     if standardize:
-        for col in features_df.columns:
-            if col in ("cluster",):
-                continue
-            col_std = features_df[col].std(ddof=0)
-            if col_std == 0 or np.isnan(col_std):
-                continue
-            features_df[col] = (features_df[col] - features_df[col].mean()) / col_std
+        scaler = StandardScaler()
+        features_df[feature_cols] = scaler.fit_transform(features_df[feature_cols])
+        y_label = "Z-Scored Feature Value"
+        title_suffix = " (Standardized)"
+    else:
+        y_label = "Feature Value"
+        title_suffix = " (Original Scale)"
 
     plot_df = features_df.melt(
         id_vars="cluster",
-        value_vars=X_with_clusters.columns.difference(["cluster", "age"]),
+        value_vars=feature_cols,
         var_name="Feature",
         value_name="Value",
     )
@@ -308,9 +336,10 @@ def build_feature_boxplots(X_with_clusters: pd.DataFrame, segment_label: str, st
         x="Feature",
         y="Value",
         color="cluster",
-        title=f"Feature Distributions by Cluster — {segment_label}",
+        title=f"Feature Distributions by Cluster — {segment_label}{title_suffix}",
+        color_discrete_sequence=px.colors.qualitative.Set2,
     )
-    fig.update_layout(xaxis_tickangle=-45, height=600)
+    fig.update_layout(xaxis_tickangle=-45, height=600, yaxis_title=y_label)
     return fig
 
 
@@ -322,7 +351,10 @@ def build_salary_contract_plots(df_with_clusters: pd.DataFrame, segment_label: s
         color="cluster",
         title=f"Average Yearly Salary by Cluster — {segment_label}",
         labels={"avg_salary_year": "Avg Salary per Year ($)", "cluster": segment_label},
+        color_discrete_sequence=px.colors.qualitative.Set2,
     )
+    salary_fig.update_yaxes(tickformat="$,.2s")
+
     contract_fig = px.box(
         df_with_clusters,
         x="cluster",
@@ -330,22 +362,38 @@ def build_salary_contract_plots(df_with_clusters: pd.DataFrame, segment_label: s
         color="cluster",
         title=f"Contract Length by Cluster — {segment_label}",
         labels={"contract_length": "Years", "cluster": segment_label},
+        color_discrete_sequence=px.colors.qualitative.Set2,
     )
     return salary_fig, contract_fig
 
 
 def run_t_tests(df_with_clusters: pd.DataFrame):
     results = []
+    
+    # Cohen's d helper
+    def cohens_d(x, y):
+        nx, ny = len(x), len(y)
+        dof = nx + ny - 2
+        std_pool = np.sqrt(((nx - 1) * np.std(x, ddof=1)**2 + (ny - 1) * np.std(y, ddof=1)**2) / dof)
+        # Handle case where pooled standard deviation is near zero
+        if std_pool == 0:
+            return 0
+        return (np.mean(x) - np.mean(y)) / std_pool
+
     if {"avg_salary_year", "contract_length", "cluster"}.issubset(df_with_clusters.columns):
+        # Salary Comparison
         salary0 = df_with_clusters[df_with_clusters["cluster"] == "0"]["avg_salary_year"]
         salary1 = df_with_clusters[df_with_clusters["cluster"] == "1"]["avg_salary_year"]
-        t_stat, p_val = stats.ttest_ind(salary0, salary1, equal_var=False)
-        results.append(("Average Salary", t_stat, p_val))
+        t_stat, p_val = stats.ttest_ind(salary0, salary1, equal_var=False, nan_policy='omit')
+        d_val = cohens_d(salary0.dropna(), salary1.dropna())
+        results.append(("Average Salary", t_stat, p_val, d_val))
 
-        c0 = df_with_clusters[df_with_clusters["cluster"] == "0"]["contract_length"]
-        c1 = df_with_clusters[df_with_clusters["cluster"] == "1"]["contract_length"]
+        # Contract Length Comparison
+        c0 = df_with_clusters[df_with_clusters["cluster"] == "0"]["contract_length"].dropna()
+        c1 = df_with_clusters[df_with_clusters["cluster"] == "1"]["contract_length"].dropna()
         t_stat_c, p_val_c = stats.ttest_ind(c0, c1, equal_var=False)
-        results.append(("Contract Length", t_stat_c, p_val_c))
+        d_val_c = cohens_d(c0, c1)
+        results.append(("Contract Length", t_stat_c, p_val_c, d_val_c))
     return results
 
 
@@ -361,7 +409,7 @@ diagnostics, PCA inspection, and compensation comparisons across clusters.
 choice = st.selectbox("Choose which group to analyze:", list(DATA_CONFIG.keys()))
 config = DATA_CONFIG[choice]
 
-st.header("📋 Notebook Highlights")
+st.header("📋 Analysis Summary")
 st.markdown(config["summary"])
 
 with st.spinner("Loading data and preparing features..."):
@@ -374,14 +422,17 @@ with st.spinner("Loading data and preparing features..."):
 st.write(f"Rows after cleaning: **{len(X_model)}**, features used: **{X_model.shape[1]}**")
 
 # Missingness view
+st.subheader("Missing Value Check")
 st.plotly_chart(build_missing_heatmap(missing_snapshot), use_container_width=True)
 
 # Elbow and silhouette diagnostics
+st.subheader("Clustering Diagnostics")
 with st.spinner("Running clustering diagnostics..."):
     base_pipe = Pipeline(
         [
             ("scaler", StandardScaler()),
-            ("pca", PCA(n_components=config["n_components"], random_state=RANDOM_STATE)),
+            # PCA here is mostly to speed up calculation and ensure consistent scaling before K-Means
+            ("pca", PCA(n_components=config["n_components"], random_state=RANDOM_STATE)), 
             ("kmeans", KMeans(init="k-means++", n_init="auto", random_state=RANDOM_STATE)),
         ]
     )
@@ -389,16 +440,17 @@ with st.spinner("Running clustering diagnostics..."):
     k_values = list(range(1, 11))
     wcss = []
     for k in k_values:
-        base_pipe.set_params(kmeans__n_clusters=k)
-        base_pipe.fit(X_model)
-        wcss.append(base_pipe["kmeans"].inertia_)
+        # NOTE: Using PCA to reduce noise and speed up K-Means fit for diagnostics
+        pipe_for_wcss = Pipeline([("scaler", StandardScaler()), ("kmeans", KMeans(n_clusters=k, init="k-means++", n_init="auto", random_state=RANDOM_STATE))])
+        pipe_for_wcss.fit(X_model)
+        wcss.append(pipe_for_wcss["kmeans"].inertia_)
 
     sil_scores = []
     sil_k = list(range(2, 11))
     for k in sil_k:
-        base_pipe.set_params(kmeans__n_clusters=k)
-        base_pipe.fit(X_model)
-        sil_scores.append(silhouette_score(X_model, base_pipe["kmeans"].labels_))
+        pipe_for_sil = Pipeline([("scaler", StandardScaler()), ("kmeans", KMeans(n_clusters=k, init="k-means++", n_init="auto", random_state=RANDOM_STATE))])
+        pipe_for_sil.fit(X_model)
+        sil_scores.append(silhouette_score(scaler.fit_transform(X_model), pipe_for_sil["kmeans"].labels_))
 
 st.plotly_chart(build_elbow_plot(k_values, wcss), use_container_width=True)
 st.plotly_chart(build_silhouette_plot(sil_k, sil_scores), use_container_width=True)
@@ -426,17 +478,22 @@ with st.spinner("Fitting PCA + K-Means model..."):
 
 cum_var_fig = build_cumulative_variance_plot(pca_step)
 biplot_fig = build_biplot(scores_df, loading_df, scores_df["cluster"], config["segment_label"])
-pair_fig = build_pair_scatter(scores_df, scores_df["cluster"], config["segment_label"])
 
-st.subheader("PCA View")
+st.subheader("PCA Dimensionality Reduction")
 st.plotly_chart(cum_var_fig, use_container_width=True)
+
+st.subheader("Principal Components Analysis")
 st.plotly_chart(biplot_fig, use_container_width=True)
+
+# Pairplot (using matplotlib/seaborn requires st.pyplot)
+pair_fig = build_pair_scatter(scores_df, scores_df["cluster"], config["segment_label"])
 st.pyplot(pair_fig, clear_figure=True)
 
 # Feature distributions by cluster
 clustered_features = X_model.copy()
 clustered_features["cluster"] = labels
-st.subheader("What separates the clusters?")
+st.subheader("Feature Distributions by Cluster")
+# Pass the boolean flag to standardize only for Pitchers
 standardize_boxes = choice == "Pitchers"
 st.plotly_chart(
     build_feature_boxplots(clustered_features, config["segment_label"], standardize=standardize_boxes),
@@ -444,8 +501,7 @@ st.plotly_chart(
 )
 if standardize_boxes:
     st.caption(
-        "Pitcher feature boxplots are z-scored to neutralize scale differences (e.g., BB_rate vs HR_rate) "
-        "so cluster separation reflects shape rather than magnitude."
+        "Pitcher feature boxplots are Z-Scored to equalize scale (e.g., K\_rate vs HR\_rate) for better visualization of cluster separation."
     )
 
 # Salary/contract comparisons
@@ -456,10 +512,28 @@ if {"avg_salary_year", "contract_length"}.issubset(salary_df.columns):
     salary_fig, contract_fig = build_salary_contract_plots(salary_df, config["segment_label"])
     st.plotly_chart(salary_fig, use_container_width=True)
     st.plotly_chart(contract_fig, use_container_width=True)
+    
     t_results = run_t_tests(salary_df)
     if t_results:
-        st.subheader("T-Tests: Salary and Contract Differences")
-        for label, t_stat, p_val in t_results:
-            st.write(f"{label}: t = {t_stat:.4f}, p = {p_val:.4e}")
+        st.subheader("Statistical Tests on Compensation")
+        test_data = []
+        for label, t_stat, p_val, d_val in t_results:
+            is_sig = p_val < 0.05
+            sig_text = "Significant" if is_sig else "Not Significant"
+            effect_size = ""
+            if abs(d_val) < 0.2: effect_size = "Negligible"
+            elif abs(d_val) < 0.5: effect_size = "Small"
+            elif abs(d_val) < 0.8: effect_size = "Medium"
+            else: effect_size = "Large"
+            
+            test_data.append([
+                label, 
+                f"{t_stat:.4f}", 
+                f"{p_val:.4e}", 
+                sig_text,
+                f"{d_val:.4f} ({effect_size})"
+            ])
+
+        st.table(pd.DataFrame(test_data, columns=["Metric", "T-statistic", "P-value", "Significance", "Cohen's d (Effect Size)"]))
 else:
     st.info("Salary/contract fields were not found in this dataset.")
