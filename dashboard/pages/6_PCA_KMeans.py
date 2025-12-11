@@ -133,7 +133,7 @@ def prepare_pitcher_features(df: pd.DataFrame):
     X["HR_rate"] = safe_divide(X["HR"], X["BFP"])
     X["GS_rate"] = safe_divide(X["GS"], X["G"])
     X["WHIP"] = safe_divide(X["H"] + X["BB"], X["IP"])
-    count_cols = ["W", "L", "G", "GS", "CG", "SHO", "SV", "H", "ER", "HR", "BB", "SO", "IBB", "BFP", "GF", "R", "SH", "SF", "GIDP", "InnOuts", "IP"]
+    count_cols = ["W", "HBP", "L", "G", "GS", "CG", "SHO", "SV", "H", "ER", "HR", "BB", "SO", "IBB", "BFP", "GF", "R", "SH", "SF", "GIDP", "InnOuts", "IP"]
     X.drop(columns=[c for c in count_cols if c in X.columns], inplace=True)
     missing_snapshot = X.copy()
     X = X.dropna()

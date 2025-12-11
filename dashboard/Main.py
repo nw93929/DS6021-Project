@@ -92,6 +92,17 @@ Our test r^squared of 0.68 indicates that our model does a pretty good job of pr
 #### Pitchers (reference KNN- Pitchers- Lasso Selection.ipynb)
 
 Our test r^squared of 0.592 indicates that our model does an okay job of predicting free agent salaries, explaining almost 60% of the variation. Our model MSE demonstrates that on average, our model misclassifies salaries by about \$2.4 million dollars. Considering the magnitude of some contracts, this seems reasonable. Looking at our predicted vs average graph, it seems that our model does a decent job of predicting salaries throughout the salary ranges, but seems to overestimate salaries in the upper ranges. Our best K being 3 indicates that our data benefits from a model that is fairly local, giving more weight to the closest few points.
+
+### **KMeans**
+
+#### Batters (reference kmeans - batters.ipynb)
+
+Based off our cluster analysis and comparisons of the characteristics of each group, we can say that cluster 0 appears to represent slightly older players on average who are more seasoned, focus on making contact rather than power plays (lower slugging percentage and strikeout rates). Meanwhile cluster 1 represents slightly younger players on average who are more "aggressive" players who prioritize power plays at cost of more strikeouts. Between these two groups, we see a statistically significant difference in salary and contract lengths, but investigating the standardized differences after accounting for outliers reveals that these differences are negligible for salary and small for contract length. So the older cluster 0 players make .2909 standard deviations less than cluster 1 players.
+
+#### Pitchers (reference kmeans - pitchers.ipynb)
+
+Based off the cluster analysis and cluster characteristic comparison visuals, we can say that cluster 0 appears to be older, less playtime players who play for a few power innings with higher strikeout rates, and allow less runs to happen. Meanwhile cluster 1 seems to represent younger, starting pitchers who allow more runs and have lower strikeout rates, probably due to the fact they are rookies and play more innings. Between these two groups, we see a statistically significant difference in salary and contract lengths, but investigating the standardized differences after accounting for outliers reveals that these differences are small for both comparisons, with older cluster 0 pitchers making about .2 standard deviations more on average.
+###
 ---
 """
 
