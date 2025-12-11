@@ -10,6 +10,13 @@ from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
+import statsmodels.api as sm
+
+def compute_pvalues(X: pd.DataFrame, y: pd.Series):
+    X_ = sm.add_constant(X)
+    model = sm.OLS(y, X_).fit()
+    return model.pvalues, model.params
+
 
 st.set_page_config(page_title="Linear Regression", page_icon="📈")
 
