@@ -229,36 +229,13 @@ def build_lasso_coef_bar(coef_df: pd.DataFrame, title: str):
 st.title("Linear Regression Salary Prediction")
 st.markdown(
     """
-Replicates the **Linear Regression Model (batters/pitchers)** notebooks using the log of free agent
-salaries. The pipeline mirrors the notebooks: drop ID/award columns, impute missing values, standardize,
-run Lasso for variable selection, and fit an ordinary least squares model.
+In order to predict MLB free agent salaries, we implement a linear regression model following feature selection via LassoCV. The target variable, `free_agent_salary`, 
+is log-transformed to better approximate normality. The modeling pipeline consists of median-imputation and one-hot encoding of categorical variables, standardization, LassoCV (5-fold) for variable selection, and finally fitting/testing an ordinary least squares regression (80/20 split).
 """
 )
 
 st.sidebar.header("Linear Regression")
 st.sidebar.write("Switch between batters and pitchers to rerun the workflow.")
-
-st.header("📋Benchmarks")
-st.markdown(
-    """
-- Batters: Test R² ≈ 0.656, log-MSE ≈ 0.349 (factor ≈ 1.6 after exponentiating)
-- Pitchers: Test R² ≈ 0.628, log-MSE ≈ 0.403 (factor ≈ 1.9 after exponentiating)
-Only the batters/pitchers notebooks are referenced (the generic and copy files are ignored).
-"""
-)
-
-st.header("ℹ️ What this page does")
-st.markdown(
-    """
-1) Load the cleaned batters/pitchers dataset  
-2) Log-transform `free_agent_salary` for a more normal target  
-3) Drop the same identifier and award columns as the notebooks  
-4) Median-impute + one-hot encode any categoricals, then standardize  
-5) Run LassoCV (5-fold) to select the strongest variables + alpha  
-6) Fit/test an OLS regression (80/20 split, random_state=42)  
-7) Show R², RMSE (log-space), RMSE in dollars, and top coefficients
-"""
-)
 
 choice = st.selectbox("Choose which players to analyze:", list(DATA_CONFIG.keys()))
 config = DATA_CONFIG[choice]
@@ -315,3 +292,37 @@ st.plotly_chart(
 st.subheader("Top coefficients (absolute value)")
 st.dataframe(results["coef_df"], use_container_width=True)
 
+import statsmodels.api as sm
+
+# Compute p-values & coefficients using statsmodels
+pvalues, params = compute_pvalues(X, y)
+pval_df = pd.DataFrame({
+    "feature": ["const"] + list(X.columns),
+    "coefficient": params.values,
+    "p_value": pvalues.values
+})
+
+st.header("🔍 Interactive Feature Exploration")
+
+selected_feature = st.selectbox(
+    "Choose a feature to analyze:",
+    X.columns
+)
+
+selected_row = pval_df[pval_df["feature"] == selected_feature].iloc[0]
+
+st.subheader("Feature Statistics")
+c1, c2 = st.columns(2)
+c1.metric("Coefficient", f"{selected_row['coefficient']:.4f}")
+c2.metric("P-value", f"{selected_row['p_value']:.4e}")
+
+# Scatterplot
+fig = px.scatter(
+    x=X[selected_feature],
+    y=y,
+    trendline="ols",
+    labels={"x": selected_feature, "y": "free_agent_salary_log"},
+    title=f"{selected_feature} vs free_agent_salary_log"
+)
+
+st.plotly_chart(fig, use_container_width=True)
