@@ -450,7 +450,7 @@ with st.spinner("Running clustering diagnostics..."):
     for k in sil_k:
         pipe_for_sil = Pipeline([("scaler", StandardScaler()), ("kmeans", KMeans(n_clusters=k, init="k-means++", n_init="auto", random_state=RANDOM_STATE))])
         pipe_for_sil.fit(X_model)
-        sil_scores.append(silhouette_score(scaler.fit_transform(X_model), pipe_for_sil["kmeans"].labels_))
+        sil_scores.append(silhouette_score(StandardScaler().fit_transform(X_model), pipe_for_sil["kmeans"].labels_))
 
 st.plotly_chart(build_elbow_plot(k_values, wcss), use_container_width=True)
 st.plotly_chart(build_silhouette_plot(sil_k, sil_scores), use_container_width=True)
