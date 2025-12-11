@@ -12,10 +12,25 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 import statsmodels.api as sm
 
-def compute_pvalues(X: pd.DataFrame, y: pd.Series):
-    X_ = sm.add_constant(X)
-    model = sm.OLS(y, X_).fit()
-    return model.pvalues, model.params
+def compute_pvalues_transformed(preprocessor, X, y):
+    # Transform X using your sklearn preprocessor
+    X_transformed = preprocessor.fit_transform(X)
+
+    # Convert to DataFrame for statsmodels
+    feature_names = preprocessor.get_feature_names_out()
+    X_df = pd.DataFrame(X_transformed, columns=feature_names)
+
+    # Add constant
+    X_df = sm.add_constant(X_df)
+
+    # Fit OLS from statsmodels
+    model = sm.OLS(y, X_df).fit()
+
+    pvalues = model.pvalues
+    params = model.params
+
+    return pvalues, params, feature_names
+
 
 
 st.set_page_config(page_title="Linear Regression", page_icon="📈")
@@ -302,7 +317,14 @@ st.dataframe(results["coef_df"], use_container_width=True)
 import statsmodels.api as sm
 
 # Compute p-values & coefficients using statsmodels
-pvalues, params = compute_pvalues(X, y)
+pvalues, params, used_features = compute_pvalues_transformed(preprocessor, X, y)
+
+pval_df = pd.DataFrame({
+    "feature": ["const"] + list(used_features),
+    "coefficient": params.values,
+    "p_value": pvalues.values
+})
+
 pval_df = pd.DataFrame({
     "feature": ["const"] + list(X.columns),
     "coefficient": params.values,
