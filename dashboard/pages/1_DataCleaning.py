@@ -10,7 +10,7 @@ st.set_page_config(page_title="Data Cleaning", page_icon="🧹")
 
 @st.cache_data
 def load_markdown_cells(notebook_path: Path, mtime: float) -> list[str]:
-    notebook_json = json.loads(notebook_path.read_text())
+    notebook_json = json.loads(notebook_path.read_text(encoding="utf-8"))
     markdown_cells = []
 
     for cell in notebook_json.get("cells", []):
