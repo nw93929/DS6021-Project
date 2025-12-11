@@ -67,7 +67,43 @@ def safe_divide(numerator, denominator):
     return np.nan_to_num(result, nan=0.0, posinf=0.0, neginf=0.0)
 
 
-# Feature preparation functions (prepare_batter_features, prepare_pitcher_features) remain the same
+# --- NEW GLOBAL HELPER FUNCTIONS START HERE ---
+
+def cohens_d(x, y):
+    """Calculates Cohen's d for two independent samples."""
+    nx, ny = len(x), len(y)
+    dof = nx + ny - 2
+    # Check for zero degrees of freedom to prevent division by zero in variance pool
+    if dof <= 0: return 0.0
+    
+    # Calculate pooled standard deviation
+    std_pool = np.sqrt(((nx - 1) * np.std(x, ddof=1)**2 + (ny - 1) * np.std(y, ddof=1)**2) / dof)
+    if std_pool == 0: return 0.0
+    
+    return (np.mean(x) - np.mean(y)) / std_pool
+
+
+def get_effect_size_label(value, test_type):
+    """Provides a qualitative label for the quantitative effect size (Cohen's d or Eta-Squared)."""
+    if test_type == "T-test":
+        # Cohen's d standards
+        value = abs(value)
+        if value < 0.2: return "Negligible"
+        elif value < 0.5: return "Small"
+        elif value < 0.8: return "Medium"
+        else: return "Large"
+    elif test_type == "ANOVA":
+        # Cohen's standard for Eta-Squared (small: 0.01, medium: 0.06, large: 0.14)
+        if value < 0.01: return "Negligible"
+        elif value < 0.06: return "Small"
+        elif value < 0.14: return "Medium"
+        else: return "Large"
+    return "N/A"
+
+# --- NEW GLOBAL HELPER FUNCTIONS END HERE ---
+
+
+# Feature preparation functions remain the same
 def prepare_batter_features(df: pd.DataFrame):
     X = df.select_dtypes(include=[np.number]).copy()
     drop_cols = ["year", "free_agent_salary", "PB", "WP", "won_cy_young", "won_mvp", "won_gold_glove", "won_silver_slugger", "all_star", "PO", "InnOuts", "A", "E", "ZR"]
@@ -264,32 +300,6 @@ def build_compensation_plot(df_with_clusters: pd.DataFrame, segment_label: str, 
 
 def run_compensation_tests(df_with_clusters: pd.DataFrame, k_selected: int):
     
-    # ----------------------------------------------------
-    # Helper functions for effect size
-    # ----------------------------------------------------
-    def cohens_d(x, y):
-        nx, ny = len(x), len(y)
-        dof = nx + ny - 2
-        std_pool = np.sqrt(((nx - 1) * np.std(x, ddof=1)**2 + (ny - 1) * np.std(y, ddof=1)**2) / dof)
-        if std_pool == 0: return 0
-        return (np.mean(x) - np.mean(y)) / std_pool
-
-    def get_effect_size_label(value, test_type):
-        if test_type == "T-test":
-            value = abs(value)
-            if value < 0.2: return "Negligible"
-            elif value < 0.5: return "Small"
-            elif value < 0.8: return "Medium"
-            else: return "Large"
-        elif test_type == "ANOVA":
-            # Cohen's standard for Eta-Squared (small: 0.01, medium: 0.06, large: 0.14)
-            if value < 0.01: return "Negligible"
-            elif value < 0.06: return "Small"
-            elif value < 0.14: return "Medium"
-            else: return "Large"
-        return "N/A"
-    # ----------------------------------------------------
-    
     if not {"avg_salary_year", "contract_length", "cluster"}.issubset(df_with_clusters.columns):
         return None, None
     
@@ -311,14 +321,15 @@ def run_compensation_tests(df_with_clusters: pd.DataFrame, k_selected: int):
         salary1 = df_for_stats[df_for_stats["cluster"] == "1"]["avg_salary_year"]
         t_stat, p_val = stats.ttest_ind(salary0, salary1, equal_var=False)
         d_val = cohens_d(salary0, salary1)
-        results.append(("Average Salary", t_stat, p_val, d_val, "T-test", None, None))
+        # Store results: (Metric, T-stat, P-value, Cohen's d, TestType, df_num, Sig_Status)
+        results.append(("Average Salary", t_stat, p_val, d_val, "T-test", None, p_val < 0.05))
 
         # Contract Length Comparison
         c0 = df_for_stats[df_for_stats["cluster"] == "0"]["contract_length"]
         c1 = df_for_stats[df_for_stats["cluster"] == "1"]["contract_length"]
         t_stat_c, p_val_c = stats.ttest_ind(c0, c1, equal_var=False)
         d_val_c = cohens_d(c0, c1)
-        results.append(("Contract Length", t_stat_c, p_val_c, d_val_c, "T-test", None, None))
+        results.append(("Contract Length", t_stat_c, p_val_c, d_val_c, "T-test", None, p_val_c < 0.05))
         
     elif k_selected > 2:
         # --- ANOVA & Tukey for k>2 ---
@@ -587,7 +598,8 @@ if {"avg_salary_year", "contract_length"}.issubset(salary_df.columns):
             for label, t_stat, p_val, d_val, _, _, _ in comp_results:
                 is_sig = p_val < 0.05
                 sig_text = "**Significant**" if is_sig else "Not Significant"
-                effect_size_label = run_compensation_tests.get_effect_size_label(d_val, "T-test")
+                # CORRECTED CALL: Using the now global get_effect_size_label
+                effect_size_label = get_effect_size_label(d_val, "T-test")
                 
                 test_data.append([
                     label, 
@@ -606,7 +618,8 @@ if {"avg_salary_year", "contract_length"}.issubset(salary_df.columns):
             for label, f_stat, p_val, eta_squared, _, df_num, is_sig_anova in comp_results:
                 is_sig_anova = p_val < 0.05
                 sig_text = "**Significant**" if is_sig_anova else "Not Significant"
-                effect_size_label = run_compensation_tests.get_effect_size_label(eta_squared, "ANOVA")
+                # CORRECTED CALL: Using the now global get_effect_size_label
+                effect_size_label = get_effect_size_label(eta_squared, "ANOVA")
                 
                 test_data.append([
                     label, 
@@ -625,36 +638,38 @@ if {"avg_salary_year", "contract_length"}.issubset(salary_df.columns):
                 "This test adjusts for multiple comparisons to determine which specific pairs of clusters are significantly different."
             )
             
+            # Use tuple mapping to retrieve the ANOVA significance status easily
+            anova_sig_map = {r[0]: r[6] for r in comp_results}
+            
+            found_tukey_results = False
             for metric, tukey_df in tukey_results.items():
                 
-                # Check if ANOVA was significant for this metric (from comp_results)
-                is_anova_sig = next((r[6] for r in comp_results if r[0] == ("Average Salary" if metric == "avg_salary_year" else "Contract Length")), False)
-                
-                if not is_anova_sig:
-                    continue # Should not happen based on run_compensation_tests logic, but good failsafe
-                
-                st.markdown(f"#### Results for **{metric.replace('_', ' ').title()}**")
-                
-                # Format the table for display
-                tukey_display_df = tukey_df.copy()
-                tukey_display_df['Mean Diff'] = tukey_display_df['Mean Diff'].apply(lambda x: f'{x:,.2f}')
-                tukey_display_df['Lower CI'] = tukey_display_df['Lower CI'].apply(lambda x: f'{x:,.2f}')
-                tukey_display_df['Upper CI'] = tukey_display_df['Upper CI'].apply(lambda x: f'{x:,.2f}')
-                tukey_display_df['Significant'] = tukey_display_df['Significant'].apply(lambda x: 'Yes' if x else 'No')
+                # Check if ANOVA was significant for this metric
+                label_key = "Average Salary" if metric == "avg_salary_year" else "Contract Length"
+                if anova_sig_map.get(label_key, False):
+                    found_tukey_results = True
+                    st.markdown(f"#### Results for **{metric.replace('_', ' ').title()}**")
+                    
+                    # Format the table for display
+                    tukey_display_df = tukey_df.copy()
+                    tukey_display_df['Mean Diff'] = tukey_display_df['Mean Diff'].apply(lambda x: f'{x:,.2f}')
+                    tukey_display_df['Lower CI'] = tukey_display_df['Lower CI'].apply(lambda x: f'{x:,.2f}')
+                    tukey_display_df['Upper CI'] = tukey_display_df['Upper CI'].apply(lambda x: f'{x:,.2f}')
+                    tukey_display_df['Significant'] = tukey_display_df['Significant'].apply(lambda x: 'Yes' if x else 'No')
 
-                # Highlight significant rows
-                def highlight_significant(row):
-                    if row['Significant'] == 'Yes':
-                        return ['background-color: #d4edda'] * len(row)  # Light green
-                    return [''] * len(row)
+                    # Highlight significant rows
+                    def highlight_significant(row):
+                        if row['Significant'] == 'Yes':
+                            return ['background-color: #d4edda'] * len(row)  # Light green
+                        return [''] * len(row)
+                    
+                    st.dataframe(
+                        tukey_display_df.style.apply(highlight_significant, axis=1),
+                        use_container_width=True
+                    )
                 
-                st.dataframe(
-                    tukey_display_df.style.apply(highlight_significant, axis=1),
-                    use_container_width=True
-                )
-                
-            if not tukey_results:
-                st.info("No Tukey's HSD test was performed because the ANOVA test was not significant ($p > 0.05$) for either compensation metric.")
+            if not found_tukey_results:
+                st.info("No Tukey's HSD test was performed because the overall ANOVA test was not significant ($p > 0.05$) for either compensation metric.")
 
 else:
     st.info("Salary/contract fields were not found in this dataset.")
