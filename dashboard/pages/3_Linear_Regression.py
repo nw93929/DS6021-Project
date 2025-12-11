@@ -317,8 +317,6 @@ st.plotly_chart(
     use_container_width=True,
 )
 
-st.subheader("Top coefficients (absolute value)")
-st.dataframe(results["coef_df"], use_container_width=True)
 
 import statsmodels.api as sm
 
