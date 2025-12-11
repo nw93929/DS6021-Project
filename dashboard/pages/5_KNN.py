@@ -151,7 +151,7 @@ st.sidebar.header("KNN Regression")
 choice = st.selectbox("Choose which players to analyze:", list(DATA_CONFIG.keys()))
 config = DATA_CONFIG[choice]
 
-st.header("📋 Notebook Notes")
+st.header("📋Notes")
 st.markdown(config["notebook_summary"])
 
 with st.spinner("Loading data and preparing features..."):
@@ -193,7 +193,3 @@ st.markdown(
 """
 )
 
-st.caption(
-    "R² and RMSE may vary slightly from the static notebook outputs due to randomized train/test split, "
-    "but the workflow and hyperparameters match the recorded analysis."
-)

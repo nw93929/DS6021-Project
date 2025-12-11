@@ -238,7 +238,7 @@ run Lasso for variable selection, and fit an ordinary least squares model.
 st.sidebar.header("Linear Regression")
 st.sidebar.write("Switch between batters and pitchers to rerun the workflow.")
 
-st.header("📋 Notebook Benchmarks")
+st.header("📋Benchmarks")
 st.markdown(
     """
 - Batters: Test R² ≈ 0.656, log-MSE ≈ 0.349 (factor ≈ 1.6 after exponentiating)
@@ -315,7 +315,3 @@ st.plotly_chart(
 st.subheader("Top coefficients (absolute value)")
 st.dataframe(results["coef_df"], use_container_width=True)
 
-st.caption(
-    "Results may vary slightly from the static notebooks due to the fresh train/test split, "
-    "but the preprocessing and model settings match the recorded analysis."
-)
