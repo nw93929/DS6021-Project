@@ -63,20 +63,34 @@ We see a similar distribution of salaries for pitchers as we did for batters, wi
 The correlation chart makes a lot of sense. The more strikeouts, innings, and wins a pitcher has, the more they make in free agency. We also see negative relationships with opponent's batting average and earned run average, both stats that pitchers are trying to avoid.
 Similar to batters, we have far too high of VIFs. The same feature selection strategies must be implemented before modeling.
 
-## Model Conclusions
+## **Model Conclusions**
 
-### Linear Regression:
-#### Batters (reference Linear Regression Model (batters).ipynb): 
+### **Linear Regression**
+
+#### Batters (reference Linear Regression Model (batters).ipynb)
+
 Looking at our outputs, we see a test R^squared of 0.656, meaning that our model explains about 66% of the variation in each free agent's salary. This indicates that our model does a decent job at predicting free agent salary. Our model's transformed MSE is 0.341, meaning after retransforming, our models are off by a factor of about 1.6. This leads a bit to be desired, but overall isn't terrible at predicting free agent batter's salaries. Overall, our feature directions makes sense, as statistics that are thought of as good, like Home Runs, Hits, and Runs have a positive relationship, and statistics that are thought of as bad, like double plays and strikeouts see a negative relationship. Interestingly, RBIs, a stat that seems like it should have a positive relationship is negative. This may not mean a lot however, as it was deemed insignificant by the model.
-#### Pitchers (reference Linear Regression Model (pitcher).ipynb): 
+
+#### Pitchers (reference Linear Regression Model (pitcher).ipynb)
+
 Looking at our outputs, we see a test R^squared of 0.63, meaning that our model explains about 63% of the variation in each free agent's salary. This indicates that our model does a decent job at predicting free agent salary. Our model's transformed MSE is 0.403, meaning after retransforming, our models are off by a factor of about 1.9. This leads a bit to be desired, but overall isn't terrible at predicting pitcher's salaries. Overall, our feature directions makes sense, as statistics that are thought of as good, like Innings, Saves, and and strikeouts have a positive relationship, and statistics that are thought of as bad, like home runs and earned runs see a negative relationship. Looking at our features, we see that some of our very strong predictors appear to be volume based, features like innings pitched, saves, and wins. 
 
-### Logistic Regression:
+### **Logistic Regression**
 
-### KNN:
-#### Batters (reference KNN- Batters - Lasso Selection.ipynb):
+#### Batters
+FILL IN
+
+#### Pitchers
+FILL IN
+
+### **KNN**
+
+#### Batters (reference KNN- Batters - Lasso Selection.ipynb)
+
 Our test r^squared of 0.68 indicates that our model does a pretty good job of predicting free agent salaries, explaining almost 70% of the variation. Our model MSE demonstrates that on average, our model misclassifies salaries by about \$2.8 million dollars. Considering the magnitude of some contracts, this seems reasonable. Looking at our predicted vs average graph, it seems that our model does a decent job of predicting salaries on the low end of the salary spectrum, but seems to overestimate salaries at the upper end. Our best K being 5 indicates that our data that is somewhat general, but still sensative to local changes.
-#### Pitchers (reference KNN- Pitchers- Lasso Selection.ipynb): 
+
+#### Pitchers (reference KNN- Pitchers- Lasso Selection.ipynb)
+
 Our test r^squared of 0.592 indicates that our model does an okay job of predicting free agent salaries, explaining almost 60% of the variation. Our model MSE demonstrates that on average, our model misclassifies salaries by about \$2.4 million dollars. Considering the magnitude of some contracts, this seems reasonable. Looking at our predicted vs average graph, it seems that our model does a decent job of predicting salaries throughout the salary ranges, but seems to overestimate salaries in the upper ranges. Our best K being 3 indicates that our data benefits from a model that is fairly local, giving more weight to the closest few points.
 ---
 """
