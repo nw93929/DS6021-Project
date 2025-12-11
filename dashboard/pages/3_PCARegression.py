@@ -179,7 +179,7 @@ st.title("PCA Regression")
 # Model Summary
 st.header("📋 Model Summary")
 st.markdown("""
-**Principal Component Regression (PCR)** combines dimensionality reduction with linear regression 
+**Principal Component Regression** uses PCA to perform dimensionality reduction before applying linear regression 
 to predict baseball player free agent salaries. This approach addresses multicollinearity among 
 performance statistics and reduces model complexity.
 
@@ -231,7 +231,7 @@ st.markdown("""
 - Batting stats: G, AB, R, H, 2B, 3B, HR, RBI, SB, CS, BB, SO, IBB, HBP, SH, SF, GIDP
 - Rate stats: BA, OBP, SLG, OPS
 - Award indicators: won_mvp, won_gold_glove, all_star, won_silver_slugger (as 0/1)
-- Pitching stats (for pitchers): W, L, G, GS, CG, SHO, SV, IPouts, H, ER, HR, BB, SO, ERA, etc.
+- Pitching stats (for pitchers): W, L, G, GS, CG, SHO, SV, IPouts, H, ER, HR, BB, SO, ERA
 """)
 
 # Results/Performance
@@ -256,7 +256,6 @@ st.markdown("---")
 
 st.markdown(
     """
-This page recreates the PCA Regression work from the notebooks for both Batters and Pitchers.
 Select a group below to load the cleaned dataset, run the PCA pipeline, and view the same
 plots used in the original analysis.
 """
