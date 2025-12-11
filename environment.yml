@@ -1,0 +1,30 @@
+name: ds6001
+channels:
+  - defaults
+dependencies:
+  - openpyxl
+  - pandas
+  - dash
+  - ipykernel
+  - prince
+  - seaborn
+  - python=3.13
+  - ipywidgets
+  - sqlalchemy
+  - jupyter
+  - mysql-connector-python
+  - matplotlib
+  - wget
+  - xlrd
+  - beautifulsoup4
+  - bs4
+  - sidetable
+  - psycopg
+  - wquantiles
+  - pymongo
+  - numba
+  - wordcloud
+  - rapidfuzz
+  - streamlit
+  - plotly
+prefix: /Users/williambrannock/miniconda3/envs/ds6001
