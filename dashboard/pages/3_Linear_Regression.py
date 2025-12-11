@@ -12,24 +12,30 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 import statsmodels.api as sm
 
-def compute_pvalues_transformed(preprocessor, X, y):
-    # Transform X using your sklearn preprocessor
-    X_transformed = preprocessor.fit_transform(X)
+def compute_pvalues_transformed(model, X, y):
+    """
+    Compute OLS p-values using the ALREADY-FITTED pipeline preprocessor.
+    """
+    # use fitted preprocessor from the model
+    preprocessor = model.named_steps["prep"]
 
-    # Convert to DataFrame for statsmodels
+    # IMPORTANT: only transform — do NOT fit again
+    X_transformed = preprocessor.transform(X)
+
+    # Get clean feature names
     feature_names = preprocessor.get_feature_names_out()
-    X_df = pd.DataFrame(X_transformed, columns=feature_names)
 
-    # Add constant
+    # Convert to DataFrame
+    X_df = pd.DataFrame(X_transformed, columns=feature_names, index=X.index)
+
+    # Add intercept
     X_df = sm.add_constant(X_df)
 
-    # Fit OLS from statsmodels
-    model = sm.OLS(y, X_df).fit()
+    # Fit OLS
+    ols_model = sm.OLS(y, X_df).fit()
 
-    pvalues = model.pvalues
-    params = model.params
+    return ols_model.pvalues, ols_model.params, feature_names
 
-    return pvalues, params, feature_names
 
 
 
@@ -317,7 +323,8 @@ st.dataframe(results["coef_df"], use_container_width=True)
 import statsmodels.api as sm
 
 # Compute p-values & coefficients using statsmodels
-pvalues, params, used_features = compute_pvalues_transformed(preprocessor, X, y)
+pvalues, params, used_features = compute_pvalues_transformed(results["model"], X, y)
+
 
 pval_df = pd.DataFrame({
     "feature": ["const"] + list(used_features),
