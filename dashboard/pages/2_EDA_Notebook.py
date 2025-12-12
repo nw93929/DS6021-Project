@@ -7,7 +7,7 @@ import streamlit as st
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 
-st.set_page_config(page_title="Exploratory Data Analysis (Notebook)", page_icon="📈")
+st.set_page_config(page_title="Exploratory Data Analysis", page_icon="📈")
 
 sns.set_theme(style="darkgrid")
 
@@ -70,7 +70,6 @@ def compute_vif(df: pd.DataFrame) -> pd.DataFrame:
 st.title("Exploratory Data Analysis")
 
 st.sidebar.header("EDA")
-st.sidebar.write("Switch between batters and pitchers to recreate the notebook plots.")
 
 choice = st.selectbox("Choose which players to analyze:", list(DATA_CONFIG.keys()))
 config = DATA_CONFIG[choice]
@@ -82,7 +81,6 @@ st.subheader(f"{choice} Dataset Overview")
 st.write(config["note"])
 st.markdown(
     """
-Context from the notebook:
 - Raw salary is sharply right-skewed with many small contracts and only a few multi-million deals.
 - Applying `log1p` produces a more normal-looking target for modeling and stabilizes variance.
 - Correlations highlight which performance stats move with free-agent pay (positive for strong production, negative for weaker outcomes/aging).
@@ -101,13 +99,13 @@ st.subheader("Salary Distributions")
 st.pyplot(plot_salary_histogram(df, "free_agent_salary", "free_agent_salary"), use_container_width=True)
 st.pyplot(plot_salary_histogram(df, "free_agent_salary_log", "free_agent_salary_log"), use_container_width=True)
 st.caption(
-    "Notebook takeaway: raw salaries pile up at low values; the log transform normalizes the response so linear models fit better."
+    "Raw salaries pile up at low values; the log transform normalizes the response so linear models fit better."
 )
 
 st.subheader("Correlations with Log Salary")
 st.pyplot(plot_heatmap_with_target(df, "free_agent_salary_log"), use_container_width=True)
 st.caption(
-    "Notebook takeaway: strongest positive relationships come from productive stats (e.g., runs/RBI for batters, strikeouts/innings for pitchers); "
+    "Strongest positive relationships come from productive stats (e.g., runs/RBI for batters, strikeouts/innings for pitchers); "
     "negative links show costly outcomes (e.g., ERA/OppBA) or aging effects."
 )
 
@@ -115,5 +113,5 @@ st.subheader("Variance Inflation Factors (VIF)")
 vif_table = compute_vif(df)
 st.dataframe(vif_table.style.format({"VIF": "{:.2f}"}), use_container_width=True)
 st.caption(
-    "Notebook takeaway: very high VIFs confirm heavy multicollinearity across performance stats, reinforcing the need for PCA or regularization."
+    "Very high VIFs confirm heavy multicollinearity across performance stats, reinforcing the need for PCA or regularization."
 )
