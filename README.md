@@ -55,4 +55,5 @@ Contains scripts for generating the following models for both Pitchers and Batte
 ## Final Presentation
 Access the final presentation for this project [here](https://docs.google.com/presentation/d/1sAUolE4szf1zlqkt2Uhf214bI3dsnUf1DcD1E-f3liA/edit?usp=sharing)
 
-
+# Deployed Dashboard
+The dashboard is hosted at this [URL](https://ds6021-baseball-salary.streamlit.app/PCA_Regression)
