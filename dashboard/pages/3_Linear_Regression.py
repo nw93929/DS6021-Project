@@ -63,10 +63,6 @@ DATA_CONFIG = {
             "won_gold_glove",
             "won_silver_slugger",
         ],
-        "notebook_notes": (
-            "From `Linear Regression Model (batters).ipynb`: log-salary test R² ≈ 0.656 "
-            "with log-MSE ≈ 0.349. Biggest coefficients centered on hits, AB, and HR."
-        ),
     },
     "Pitchers": {
         "file": "final_pitchers_df.csv",
@@ -91,10 +87,6 @@ DATA_CONFIG = {
             "won_silver_slugger",
             "all_star",
         ],
-        "notebook_notes": (
-            "From `Linear Regression Model (pitchers).ipynb`: log-salary test R² ≈ 0.628 "
-            "with log-MSE ≈ 0.403. GS, ER, and SV carry the strongest weights."
-        ),
     },
 }
 
@@ -267,9 +259,6 @@ st.sidebar.write("Switch between batters and pitchers to rerun the workflow.")
 
 choice = st.selectbox("Choose which players to analyze:", list(DATA_CONFIG.keys()))
 config = DATA_CONFIG[choice]
-
-st.subheader(f"{choice} notebook notes")
-st.info(config["notebook_notes"])
 
 with st.spinner("Loading data and building features..."):
     df = load_dataset(config["file"])
