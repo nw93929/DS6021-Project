@@ -127,6 +127,16 @@ def clean_feature_name(raw: str) -> str:
     return raw.split("__", 1)[-1]
 
 
+def derive_form_features(coef_df: pd.DataFrame) -> list[str]:
+    """Map coefficient feature names to user-facing inputs (collapse one-hot positions)."""
+    form_features: list[str] = []
+    for feature in coef_df.loc[coef_df["Coefficient"] != 0, "Feature"]:
+        key = "position" if feature.startswith("Position:") else feature
+        if key not in form_features:
+            form_features.append(key)
+    return form_features
+
+
 def prepare_features(df: pd.DataFrame, feature_cols: list[str]):
     df = df.copy()
     df["contract_binary"] = df["contract_length"].apply(build_contract_binary)
@@ -146,6 +156,67 @@ def prepare_features(df: pd.DataFrame, feature_cols: list[str]):
         sparse_threshold=0,
     )
     return X, y, preprocess
+
+
+@st.cache_resource(show_spinner=False)
+def train_final_lasso_model(player_type: str):
+    cfg = DATA_CONFIG[player_type]
+    df = load_dataset(cfg["file"])
+    X, y, preprocess = prepare_features(df, cfg["features"])
+
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
+    model = Pipeline(
+        [
+            ("prep", preprocess),
+            (
+                "logit",
+                LogisticRegressionCV(
+                    penalty="l1",
+                    solver="saga",
+                    Cs=25,
+                    cv=cv,
+                    scoring="neg_log_loss",
+                    max_iter=8000,
+                    n_jobs=-1,
+                ),
+            ),
+        ]
+    )
+    model.fit(X, y)
+    feature_names = model.named_steps["prep"].get_feature_names_out()
+    coefs = model.named_steps["logit"].coef_.ravel()
+
+    active_features = set()
+    for raw_name, coef in zip(feature_names, coefs):
+        if coef == 0:
+            continue
+        if raw_name.startswith("encoder__position_"):
+            active_features.add("position")
+        else:
+            active_features.add(raw_name.split("__", 1)[-1])
+
+    return model, sorted(active_features)
+
+
+def build_feature_defaults(df: pd.DataFrame, feature_cols: list[str]):
+    defaults: dict[str, int | str] = {}
+    bounds: dict[str, tuple[int, int]] = {}
+
+    for col in feature_cols:
+        series = df[col].dropna()
+        if col == "position":
+            defaults[col] = series.mode().iat[0] if not series.empty else ""
+            continue
+
+        if series.empty:
+            defaults[col] = 0
+            bounds[col] = (0, 100)
+            continue
+
+        defaults[col] = int(round(series.median()))
+        bounds[col] = (int(series.min()), int(series.max()))
+
+    return defaults, bounds
 
 
 @st.cache_data(show_spinner=False)
@@ -226,8 +297,11 @@ def run_logistic_workflow(player_type: str):
 
 
 def build_coef_fig(coef_df: pd.DataFrame, title: str):
+    active = coef_df.loc[coef_df["Coefficient"] != 0]
+    if active.empty:
+        active = coef_df
     fig = px.bar(
-        coef_df.head(15),
+        active,
         x="Coefficient",
         y="Feature",
         orientation="h",
@@ -289,50 +363,6 @@ data_col3.metric("Total Features", f"{len(cfg['features'])}")
 
 st.divider()
 
-# ==================== 2. MODEL PIPELINE ====================
-st.header("🔧 Model Pipeline")
-st.markdown(f"""
-**Pipeline Components:**
-1. **Preprocessing**
-   - Categorical Encoding: One-Hot Encoding for position (drop first category)
-   - Numeric Scaling: StandardScaler for all numeric features
-2. **Base Model**
-   - Algorithm: Logistic Regression
-   - Class Weights: Balanced (to handle class imbalance)
-   - Max Iterations: 2000
-3. **Regularization Model**
-   - Algorithm: Logistic Regression with L1 (Lasso) penalty
-   - Solver: SAGA
-   - Hyperparameter Tuning: 25 values of C (regularization strength)
-   - Cross-Validation: 5-fold Stratified K-Fold
-   - Optimization Metric: Negative Log Loss
-""")
-
-st.markdown(f"**Input Features ({len(cfg['features'])}):** {', '.join(cfg['features'][:10])}{'...' if len(cfg['features']) > 10 else ''}")
-
-st.divider()
-
-# ==================== 3. PREDICTIONS - CONFUSION MATRIX ====================
-st.header("🎯 Predictions – Confusion Matrix")
-st.markdown("**Holdout Test Set Performance** (20% of data, stratified split)")
-
-cm = results["holdout"]["confusion"]
-cm_fig = px.imshow(
-    cm,
-    text_auto=True,
-    labels={"x": "Predicted Label", "y": "Actual Label"},
-    x=["Short-term (1-2 yr)", "Long-term (3+ yr)"],
-    y=["Short-term (1-2 yr)", "Long-term (3+ yr)"],
-    color_continuous_scale="Blues",
-)
-cm_fig.update_layout(height=450, coloraxis_showscale=False)
-st.plotly_chart(cm_fig, use_container_width=True)
-
-st.caption(f"✓ Correctly classified short-term: {cm[0,0]} | ✗ Misclassified as long-term: {cm[0,1]}")
-st.caption(f"✗ Misclassified as short-term: {cm[1,0]} | ✓ Correctly classified long-term: {cm[1,1]}")
-
-st.divider()
-
 # ==================== 4. TRAIN TEST OUTPUT ====================
 st.header("📈 Train-Test Split Results")
 st.markdown("**Holdout Test Set (20%)** – Base Logistic Regression Model")
@@ -347,7 +377,24 @@ test_col3.metric("AUC-ROC (L1 model)", f"{results['roc']['auc']:.4f}",
 
 st.divider()
 
-# ==================== 5. CROSS-VALIDATION OUTPUT ====================
+# ==================== 5. REGULARIZATION OUTPUT ====================
+st.header("🎚️ Regularization (L1/Lasso) Output")
+st.markdown("""
+**L1 (Lasso) Regularization** performs automatic feature selection by shrinking less important coefficients to zero.
+This helps identify the most predictive features and reduces overfitting.
+""")
+
+non_zero_coefs = (results["coef_df"]["Coefficient"] != 0).sum()
+zero_coefs = len(results["coef_df"]) - non_zero_coefs
+
+reg_col1, reg_col2, reg_col3 = st.columns(3)
+reg_col1.metric("Features Retained", f"{non_zero_coefs}")
+reg_col2.metric("Features Eliminated", f"{zero_coefs}")
+reg_col3.metric("Retention Rate", f"{non_zero_coefs/len(results['coef_df'])*100:.1f}%")
+
+st.divider()
+
+# ==================== 6. CROSS-VALIDATION OUTPUT ====================
 st.header("🔄 Cross-Validation Results")
 st.markdown("**5-Fold Stratified Cross-Validation** – Base Logistic Regression Model")
 
@@ -366,56 +413,24 @@ st.dataframe(fold_df, hide_index=True, use_container_width=True)
 
 st.divider()
 
-# ==================== 6. REGULARIZATION OUTPUT ====================
-st.header("🎚️ Regularization (L1/Lasso) Output")
-st.markdown("""
-**L1 (Lasso) Regularization** performs automatic feature selection by shrinking less important coefficients to zero.
-This helps identify the most predictive features and reduces overfitting.
-""")
+# ==================== 7. PREDICTIONS - CONFUSION MATRIX ====================
+st.header("🎯 Predictions – Confusion Matrix")
+st.markdown("**Holdout Test Set Performance** (20% of data, stratified split)")
 
-non_zero_coefs = (results["coef_df"]["Coefficient"] != 0).sum()
-zero_coefs = len(results["coef_df"]) - non_zero_coefs
+cm = results["holdout"]["confusion"]
+cm_fig = px.imshow(
+    cm,
+    text_auto=True,
+    labels={"x": "Predicted Label", "y": "Actual Label"},
+    x=["Short-term (1-2 yr)", "Long-term (3+ yr)"],
+    y=["Short-term (1-2 yr)", "Long-term (3+ yr)"],
+    color_continuous_scale="Blues",
+)
+cm_fig.update_layout(height=450, coloraxis_showscale=False)
+st.plotly_chart(cm_fig, use_container_width=True)
 
-reg_col1, reg_col2, reg_col3 = st.columns(3)
-reg_col1.metric("Features Retained", f"{non_zero_coefs}")
-reg_col2.metric("Features Eliminated", f"{zero_coefs}")
-reg_col3.metric("Retention Rate", f"{non_zero_coefs/len(results['coef_df'])*100:.1f}%")
-
-st.divider()
-
-# ==================== 7. TOP FEATURES COEFFICIENTS AND ODDS ====================
-st.header("⭐ Top Feature Coefficients and Odds Ratios")
-
-pos_table = results["coef_df"].query("Coefficient > 0").head(8)
-neg_table = results["coef_df"].query("Coefficient < 0").head(8)
-
-odds_col1, odds_col2 = st.columns(2)
-
-with odds_col1:
-    st.markdown("### ✅ Top Positive Predictors")
-    st.markdown("*Features that increase the odds of long-term contracts*")
-    st.dataframe(
-        pos_table[["Feature", "Coefficient", "Odds Ratio"]].style.format({
-            "Coefficient": "{:.4f}",
-            "Odds Ratio": "{:.4f}"
-        }),
-        hide_index=True,
-        use_container_width=True
-    )
-
-with odds_col2:
-    st.markdown("### ❌ Top Negative Predictors")
-    st.markdown("*Features that decrease the odds of long-term contracts*")
-    st.dataframe(
-        neg_table[["Feature", "Coefficient", "Odds Ratio"]].style.format({
-            "Coefficient": "{:.4f}",
-            "Odds Ratio": "{:.4f}"
-        }),
-        hide_index=True,
-        use_container_width=True
-    )
-
-st.caption("💡 **Interpretation:** An odds ratio > 1 increases long-term contract probability; < 1 decreases it.")
+st.caption(f"✓ Correctly classified short-term: {cm[0,0]} | ✗ Misclassified as long-term: {cm[0,1]}")
+st.caption(f"✗ Misclassified as short-term: {cm[1,0]} | ✓ Correctly classified long-term: {cm[1,1]}")
 
 st.divider()
 
@@ -450,71 +465,64 @@ st.plotly_chart(
 auc_interpretation = "Excellent" if results['roc']['auc'] > 0.9 else "Good" if results['roc']['auc'] > 0.8 else "Fair" if results['roc']['auc'] > 0.7 else "Poor"
 st.caption(f"**AUC = {results['roc']['auc']:.3f}** – Model discrimination is **{auc_interpretation}**")
 
+# ==================== 2B. INTERACTIVE PREDICTION TOOL ====================
 st.divider()
+st.header("🛠️ Try the Final Logistic Model")
+st.markdown(
+    "Estimate the probability of a **long-term contract (3+ years)** using the final L1 logistic model. "
+    "Inputs are restricted to whole numbers; decimals will be rounded."
+)
 
-# ==================== 10. FINDINGS ====================
-st.header("🔍 Key Findings")
-for highlight in cfg["highlights"]:
-    st.markdown(f"- {highlight}")
+model, model_features = train_final_lasso_model(player_type)
+coef_inputs = results["coef_df"]
+form_features = derive_form_features(coef_inputs) or model_features
+defaults_all, bounds_all = build_feature_defaults(results["df"], cfg["features"])
+defaults_final, bounds_final = build_feature_defaults(results["df"], form_features)
+positions = sorted(results["df"]["position"].dropna().unique().tolist())
+pos_default = defaults_all.get("position", positions[0] if positions else "")
 
-st.divider()
+with st.form(f"{player_type}_prediction_form"):
+    if "position" in form_features:
+        position_choice = st.selectbox(
+            "Position",
+            positions,
+            index=positions.index(pos_default) if pos_default in positions else 0,
+        )
+    else:
+        position_choice = pos_default
 
-# ==================== 11. INTERPRETATION ====================
-st.header("💡 Model Interpretation & Limitations")
+    numeric_features = [feat for feat in form_features if feat != "position"]
+    cols = st.columns(3)
+    numeric_inputs: dict[str, int] = {}
 
-if player_type == "Batters":
-    st.markdown("""
-    ### Key Insights for Batters
-    
-    **What Drives Long-Term Contracts:**
-    - **Hits (H)** and **RBI** are the strongest positive signals – teams reward offensive production
-    - **Silver Slugger Award** provides a moderate boost, validating elite hitting ability
-    - **Sacrifice Flies (SF)** positively correlate, suggesting clutch/situational hitting is valued
-    
-    **What Limits Long-Term Contracts:**
-    - **Age** is the dominant negative factor – older hitters face dramatically lower odds
-    - **GIDP (Grounding Into Double Plays)** hurts odds, signaling slower/less athletic players
-    - Many volume stats (At-Bats, Stolen Bases) were eliminated by Lasso, showing teams care more about efficiency than raw playing time
-    
-    ### Model Performance Summary
-    - Cross-validation accuracy: **~88%** (Log Loss: 0.283)
-    - Holdout test accuracy: **~79%** (AUC: 0.898)
-    - Strong class separation, though minority class (long-term) harder to predict
-    
-    ### Limitations
-    - **Temporal bias:** Data from 2003 era; modern Statcast metrics (exit velocity, launch angle) not included
-    - **Class imbalance:** ~86% short-term vs 14% long-term contracts
-    - **Missing context:** No injury history, market conditions, or team-specific factors
-    - **Selection bias:** Only includes players who received contracts; excludes those who retired or went unsigned
-    """)
-else:
-    st.markdown("""
-    ### Key Insights for Pitchers
-    
-    **What Drives Long-Term Contracts:**
-    - **Wins (W)** are the strongest positive predictor – teams still value traditional success metrics
-    - **Games Pitched (G)** and **Complete Games (CG)** signal durability and workhorse mentality
-    - **Strikeouts (SO)** and **Saves (SV)** provide significant boosts – dominance and defined role matter
-    
-    **What Limits Long-Term Contracts:**
-    - **Age** is the dominant negative – pitchers age poorly, risk increases dramatically after 30
-    - **ERA (Earned Run Average)** sharply reduces odds – run prevention is paramount
-    - **Shutouts (SHO)** and **Intentional Walks (IBB)** surprisingly negative (possibly multicollinearity)
-    - **Awards** (All-Star, Cy Young, MVP) were largely eliminated – performance stats capture their signal
-    
-    ### Model Performance Summary
-    - Cross-validation accuracy: **~87%** (Log Loss: 0.335)
-    - Holdout test accuracy: **~67%** (AUC: 0.741)
-    - Lower AUC than batters suggests harder discrimination task for pitchers
-    
-    ### Limitations
-    - **Role ambiguity:** No distinction between starters and relievers (very different value propositions)
-    - **Injury blind spot:** No Tommy John surgery flags or injury history
-    - **Outdated metrics:** 2003-era stats; missing modern analytics (spin rate, whiff rate, hard contact %)
-    - **Class imbalance:** Similar 85/15 split favoring short-term deals
-    - **Market dynamics:** No team budget, positional needs, or competitive window considerations
-    """)
+    for idx, feature in enumerate(numeric_features):
+        min_val, max_val = bounds_final.get(feature, (0, 500))
+        default_val = defaults_final.get(feature, min_val)
+        numeric_inputs[feature] = cols[idx % 3].number_input(
+            feature,
+            min_value=min_val,
+            max_value=max_val,
+            value=default_val,
+            step=1,
+            format="%d",
+        )
 
-st.divider()
+    submitted = st.form_submit_button("Predict Contract Type")
+
+if submitted:
+    sample = {**defaults_all}
+    sample["position"] = position_choice
+    sample.update({feat: int(val) for feat, val in numeric_inputs.items()})
+    pred_df = pd.DataFrame([sample], columns=cfg["features"])
+
+    prob_long = float(model.predict_proba(pred_df)[0, 1])
+    prob_short = 1 - prob_long
+    predicted_label = "Long-term (3+ yr)" if prob_long >= 0.5 else "Short-term (1–2 yr)"
+
+    prob_col1, prob_col2 = st.columns(2)
+    prob_col1.metric("P(Long-term, 3+ yr)", f"{prob_long*100:.1f}%")
+    prob_col2.metric("P(Short-term, 1–2 yr)", f"{prob_short*100:.1f}%")
+    st.progress(prob_long)
+    st.caption(f"Predicted class: **{predicted_label}**")
 
 st.caption("📌 **Data Source:** MLB contract and performance data (2003 era) | **Model:** Scikit-learn Logistic Regression with L1 regularization")
