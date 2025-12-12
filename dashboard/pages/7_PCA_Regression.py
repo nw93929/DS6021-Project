@@ -223,12 +223,6 @@ with st.spinner("Running PCA and PCR..."):
     ev_df, scores_df, loading_df = compute_pca_outputs(X)
     results = run_pcr(X, y, n_components=config["n_components"])
 
-metric_cols = st.columns(4)
-metric_cols[0].metric("Train R²", f"{results['train_r2']:.3f}")
-metric_cols[1].metric("Test R²", f"{results['test_r2']:.3f}")
-metric_cols[2].metric("Train RMSE", f"{results['train_rmse']:.1f}")
-metric_cols[3].metric("Test RMSE", f"{results['test_rmse']:.1f}")
-
 st.plotly_chart(build_correlation_heatmap(X, "Correlation Matrix of Original Variables"), use_container_width=True)
 st.plotly_chart(build_scree_plot(ev_df), use_container_width=True)
 st.plotly_chart(
@@ -253,3 +247,10 @@ if loading_cols_to_show:
         ),
         use_container_width=True,
     )
+
+st.header("📈 Model Performance")
+metric_cols = st.columns(4)
+metric_cols[0].metric("Train R²", f"{results['train_r2']:.3f}")
+metric_cols[1].metric("Test R²", f"{results['test_r2']:.3f}")
+metric_cols[2].metric("Train RMSE", f"{results['train_rmse']:.1f}")
+metric_cols[3].metric("Test RMSE", f"{results['test_rmse']:.1f}")
