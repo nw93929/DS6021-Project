@@ -69,26 +69,6 @@ def compute_vif(df: pd.DataFrame) -> pd.DataFrame:
 
 st.title("Exploratory Data Analysis")
 
-st.header("📋 What you'll see")
-st.markdown(
-    """
-This page recreates the key exploratory visuals from the EDA notebook for both batters and pitchers:
-
-- Raw free agent salary distribution
-- Log-transformed salary distribution
-- Correlations of each feature with log salary
-- Variance Inflation Factors (VIF) to assess multicollinearity
-"""
-)
-
-st.header("🧭 How to use")
-st.markdown(
-    """
-Choose a group to load the cleaned dataset, apply the same log transformation, and render the exact
-seaborn/matplotlib visuals used in the notebook.
-"""
-)
-
 st.sidebar.header("EDA")
 st.sidebar.write("Switch between batters and pitchers to recreate the notebook plots.")
 

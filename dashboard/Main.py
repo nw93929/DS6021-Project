@@ -20,16 +20,20 @@ One of the most chaotic and anticipated parts of every MLB season is the offseas
 
 Given this complexity, this project focuses specifically on understanding the relationship between player performance and the resulting salary and contract length. To investigate these dynamics, we developed both supervised and unsupervised learning models designed to answer the following questions:
 
-1. **Given player awards, performance statistics, league-average salary, age, and other relevant factors, can we predict a player’s annual average salary (AAV)?**
-2. **Can we also predict whether a player will sign a multi-year contract?**
+1. 💰 Predict Free Agent’s Annual Contract Value (AAV)?
 
-The following models were developed to answer these questions:
-* Linear Regression
-* Binary Logistic
-* PCA
-* PCA Regression
-* KNN
-* KMeans
+2. 📆 Predict Free Agent’s Contract Length?
+
+3. 📊 What factors impact the predictions the most?
+
+4. 🧩 What characteristics are associated with higher salaries?
+
+The following models were developed to answer these questions (Research questions answered in parentheses):
+* Linear Regression (1,3)
+* Binary Logistic (2,3)
+* PCA Regression (1,3)
+* KNN (1)
+* KMeans (4)
 
 For more information please visit the respective tabs for each of these models.
 

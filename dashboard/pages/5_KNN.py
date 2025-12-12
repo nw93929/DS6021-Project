@@ -151,7 +151,7 @@ st.sidebar.header("KNN Regression")
 choice = st.selectbox("Choose which players to analyze:", list(DATA_CONFIG.keys()))
 config = DATA_CONFIG[choice]
 
-st.header("📋Notes")
+st.header("📋Overview")
 st.markdown(config["notebook_summary"])
 
 with st.spinner("Loading data and preparing features..."):
