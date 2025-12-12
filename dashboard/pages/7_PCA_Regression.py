@@ -188,46 +188,6 @@ to predict baseball player free agent salaries. This approach addresses multicol
 performance statistics and reduces model complexity.
 """)
 
-# About the Model
-st.header("ℹ️ About the Model")
-st.markdown("""
-**Principal Component Analysis (PCA)** transforms correlated features into uncorrelated principal components 
-ordered by the amount of variance they explain. PCR then uses these components as predictors in linear regression.
-
-**Why PCA Regression?**
-- **Reduces multicollinearity**: Baseball statistics are often highly correlated (e.g., hits, runs, RBIs)
-- **Dimensionality reduction**: Transforms 20+ features into 4-5 meaningful components
-- **Improves interpretability**: Each PC captures a pattern of related statistics
-- **Prevents overfitting**: Fewer predictors reduce model complexity
-
-**Model Pipeline:**
-1. Standardize features (mean=0, std=1)
-2. Apply PCA to create principal components
-3. Fit linear regression on selected PCs
-4. Predict salaries on test set
-""")
-
-# Feature Selection
-st.header("🔍 Feature Selection")
-st.markdown("""
-**PCA requires numeric features only.** The selection process:
-
-1. **Start with cleaned dataset**: `final_batters_df.csv` or `final_pitchers_df.csv`
-2. **Drop non-predictive columns**: 
-   - Identifiers: `row_id`, `playerID`, `year`
-   - Target variable: `free_agent_salary`
-   - Missing/problematic: `ZR` (zone rating)
-3. **Cast categorical flags**: Binary indicators like `won_mvp`, `all_star` are kept as numeric (0/1)
-4. **Select numeric types only**: `select_dtypes(include=[np.number])`
-5. **Remove missing values**: Drop any rows with NaN after feature selection
-
-**Typical Features Included:**
-- Batting stats: G, AB, R, H, 2B, 3B, HR, RBI, SB, CS, BB, SO, IBB, HBP, SH, SF, GIDP
-- Rate stats: BA, OBP, SLG, OPS
-- Award indicators: won_mvp, won_gold_glove, all_star, won_silver_slugger (as 0/1)
-- Pitching stats (for pitchers): W, L, G, GS, CG, SHO, SV, IPouts, H, ER, HR, BB, SO, ERA
-""")
-
 # Results/Performance
 st.header("📊 Plot Interpretations")
 st.markdown("""
